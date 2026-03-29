@@ -4,8 +4,7 @@
 #include <iostream>
 #include <thread>
 
-Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port,
-             uint8_t channel, uint16_t parameter)
+Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port, uint8_t channel, uint16_t parameter)
     : io_context_(io_context), socket_(io_context), host_(host), port_(port),
       midiChannel_(channel), parameter_(parameter) {}
 
@@ -102,7 +101,6 @@ void Mixer::closeSocketIfOpen() {
   if (socket_.is_open()) {
     try {
       socket_.close();
-    } catch (...) {
-    }
+    } catch (...) {}
   }
 }
