@@ -1,0 +1,33 @@
+# Build artifacts
+build/
+bin/
+obj/
+*.o
+*.a
+*.dylib
+*.so
+*.exe
+*.out
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+CMakeConfigureLog.yaml
+cmake_install.cmake
+Makefile
+compile_commands.json
+.cmake/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Cache
+.cache/
+
+# Submodules (libs/rtmidi is a submodule, so it should be managed via .gitmodules)
+# But we keep the folder structure
+# libs/rtmidi/ is handled by git submodule
