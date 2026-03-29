@@ -23,6 +23,8 @@ add_executable(${PROJECT_NAME}
     src/mixer.hpp
     src/midi_manager.cpp
     src/midi_manager.hpp
+    src/config_loader.cpp
+    src/config_loader.hpp
 )
 
 # 4. Include paths

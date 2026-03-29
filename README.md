@@ -16,10 +16,19 @@ This utility listens for MIDI Clock (0xF8) or specific MIDI CC/Note messages fro
 
 ## Setup
 
-1. **Mixer Configuration**:
-   - Ensure your GLD mixer is on the network.
-   - Default IP is set to `192.168.1.10` (configurable in `src/main.cpp`).
-   - The mixer listens on port `51325`.
+1. **Configuration**:
+   Create a `config.txt` file in the same directory as the executable to customize settings. If no file is found, the application uses the defaults shown below:
+
+   ```ini
+   IP=192.168.1.10
+   PORT=51325
+   CHANNEL=0
+   PARAMETER=8449
+   ```
+
+   - **IP/PORT**: The network address of your GLD mixer.
+   - **CHANNEL**: MIDI Channel (0-15).
+   - **PARAMETER**: The 14-bit NRPN parameter ID. (Default `8449` = FX Slot 3, Param 1/Time).
 
 2. **DAW Configuration (Reaper)**:
    - Go to `Preferences > MIDI Devices`.

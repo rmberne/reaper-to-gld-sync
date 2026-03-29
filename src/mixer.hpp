@@ -1,14 +1,16 @@
 #pragma once
 #include <asio.hpp>
+#include <atomic>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 class Mixer {
 public:
-  Mixer(asio::io_context &io_context, std::string_view host,
-        std::string_view port);
+  Mixer(asio::io_context &io_context, std::string host, std::string port,
+        uint8_t channel, uint16_t parameter);
   ~Mixer();
 
   // Establishes a TCP connection to the mixer
@@ -31,6 +33,8 @@ private:
   asio::ip::tcp::socket socket_;
   std::string host_;
   std::string port_;
+  uint8_t midiChannel_;
+  uint16_t parameter_;
   std::atomic<bool> connected_{false};
   std::unique_ptr<std::thread> reconnectThread_;
   void runReconnectLoop();
