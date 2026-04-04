@@ -8,15 +8,20 @@
 namespace rt {
 namespace midi {
 
+class PulseManager; // Forward declaration
+
 class MidiManager {
 public:
   using SyncCallback = std::function<void(float bpm, float multiplier)>;
+  using ClockCallback = std::function<void(unsigned char status)>;
 
   MidiManager(SyncCallback callback);
   ~MidiManager();
 
   bool openDefaultPort();
   void start();
+
+  void setClockCallback(ClockCallback callback) { clockCallback_ = callback; }
 
 private:
   static void staticCallback(double deltatime,
@@ -26,6 +31,7 @@ private:
 
   std::unique_ptr<RtMidiIn> midiin_;
   SyncCallback callback_;
+  ClockCallback clockCallback_;
 
   float currentBPM_ = 120.0f;
   float multiplier_ = 1.0f;

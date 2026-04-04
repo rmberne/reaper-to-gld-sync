@@ -1,6 +1,7 @@
 #include "config_loader.hpp"
 #include "midi_manager.hpp"
 #include "mixer.hpp"
+#include "pulse_manager.hpp"
 #include <asio.hpp>
 #include <iostream>
 #include <memory>
@@ -11,27 +12,49 @@ int main() {
 
     // 1. Load Configuration
     auto config = config::ConfigLoader::load("config.txt");
-    std::cout << "[Config] Mixer: " << config.mixerIp << ":" << config.mixerPort
-              << " Channel: " << (int)config.midiChannel
-              << " Parameter: " << config.nrpnParam << std::endl;
+    std::cout << "[Config] Mixer Enabled: " << (config.mixerEnabled ? "Yes" : "No") << std::endl;
+    std::cout << "[Config] Pulse Enabled: " << (config.pulseEnabled ? "Yes" : "No") << std::endl;
 
-    // 2. Initialize Mixer
-    auto mixer =
-        std::make_shared<Mixer>(io_context, config.mixerIp, config.mixerPort,
-                                config.midiChannel, config.nrpnParam);
-    mixer->startReconnectionThread();
+    // 2. Initialize Mixer (if enabled)
+    std::shared_ptr<Mixer> mixer;
+    if (config.mixerEnabled) {
+      mixer = std::make_shared<Mixer>(io_context, config.mixerIp, config.mixerPort,
+                                      config.midiChannel, config.nrpnParam);
+      mixer->startReconnectionThread();
+    }
 
-    // 3. Initialize MIDI Manager
-    rt::midi::MidiManager midiManager([mixer](float bpm, float multiplier) {
-      std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << "x"
-                << std::endl;
-      if (mixer->isConnected()) {
+    // 3. Initialize Pulse (if enabled)
+    std::shared_ptr<rt::midi::PulseManager> pulse;
+    if (config.pulseEnabled) {
+      pulse = std::make_shared<rt::midi::PulseManager>();
+      if (!pulse->openPort()) {
+        std::cerr << "[Main] Failed to open Pulse MIDI port. Disabling Pulse." << std::endl;
+        pulse.reset();
+      }
+    }
+
+    // 4. Initialize MIDI Manager
+    rt::midi::MidiManager midiManager([&](float bpm, float multiplier) {
+      std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << "x" << std::endl;
+      if (mixer && mixer->isConnected()) {
         mixer->syncToBPM(bpm, multiplier);
+      }
+      if (pulse) {
+        pulse->setBpm(static_cast<int>(bpm));
       }
     });
 
-    // 4. Setup and Start MIDI
-    std::cout << "[Main] Setting up MIDI..." << std::endl;
+    // 5. Setup Clock Forwarding (Direct handover for lowest latency)
+    if (pulse) {
+      midiManager.setClockCallback([pulse](unsigned char status) {
+        if (status == 0xF8) pulse->sendClock();
+        else if (status == 0xFA || status == 0xFB) pulse->sendStart();
+        else if (status == 0xFC) pulse->sendStop();
+      });
+    }
+
+    // 6. Setup and Start MIDI Input
+    std::cout << "[Main] Setting up MIDI Input..." << std::endl;
     if (!midiManager.openDefaultPort()) {
       std::cerr << "[Main] Failed to open MIDI port." << std::endl;
       return 1;

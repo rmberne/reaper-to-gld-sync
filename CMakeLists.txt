@@ -25,6 +25,8 @@ add_executable(${PROJECT_NAME}
     src/midi_manager.hpp
     src/config_loader.cpp
     src/config_loader.hpp
+    src/pulse_manager.mm
+    src/pulse_manager.hpp
 )
 
 # 4. Include paths
@@ -42,6 +44,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     "-framework CoreAudio"
     "-framework CoreFoundation"
     "-framework CoreServices"
+    "-framework CoreBluetooth"
+    "-framework Foundation"
 )
 
 # Optional: Print architecture info at the end of the build
@@ -49,3 +53,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
     COMMENT "Verifying binary architectures..."
 )
+
+# 6. Tests
+add_executable(test_config tests/test_config.cpp src/config_loader.cpp)
+target_include_directories(test_config PRIVATE src)
