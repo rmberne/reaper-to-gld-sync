@@ -62,6 +62,8 @@ void MidiManager::handleMidiMessage(double deltatime,
   // --- NEW: Handle Transport Start/Continue/Stop ---
   // 0xFA = Start, 0xFB = Continue, 0xFC = Stop
   if (statusByte == 0xFA || statusByte == 0xFB || statusByte == 0xFC) {
+    if (clockCallback_)
+      clockCallback_(statusByte);
     firstClock_ = true;
     clockCount_ = 0;
     validBeats_ = 0; // Reset the warm-up period
@@ -70,6 +72,8 @@ void MidiManager::handleMidiMessage(double deltatime,
 
   // 1. MIDI Clock (0xF8)
   if (statusByte == 0xF8) {
+    if (clockCallback_)
+      clockCallback_(statusByte);
     clockCount_++;
 
     if (clockCount_ >= 24) { // One quarter note

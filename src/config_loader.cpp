@@ -32,6 +32,10 @@ Config ConfigLoader::load(const std::string &filename) {
             config.midiChannel = static_cast<uint8_t>(std::stoi(value));
           else if (key == "PARAMETER")
             config.nrpnParam = static_cast<uint16_t>(std::stoi(value));
+          else if (key == "MIXER_ENABLED")
+            config.mixerEnabled = (value == "true" || value == "1");
+          else if (key == "PULSE_ENABLED")
+            config.pulseEnabled = (value == "true" || value == "1");
         } catch (const std::exception &e) {
           std::cerr << "[Config] Error parsing line '" << line
                     << "': " << e.what() << std::endl;
