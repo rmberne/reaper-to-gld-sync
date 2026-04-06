@@ -2,46 +2,40 @@
 #include <RtMidi.h>
 #include <functional>
 #include <memory>
-#include <string>
 #include <vector>
 
-namespace rt {
-namespace midi {
+namespace rt::midi {
 
-class PulseManager; // Forward declaration
+  class PulseManager; // Forward declaration
 
-class MidiManager {
+  class MidiManager {
 public:
-  using SyncCallback = std::function<void(float bpm, float multiplier)>;
-  using ClockCallback = std::function<void(unsigned char status)>;
+    using SyncCallback = std::function<void(float bpm, float multiplier)>;
+    using ClockCallback = std::function<void(unsigned char status)>;
 
-  MidiManager(SyncCallback callback);
-  ~MidiManager();
+    MidiManager(SyncCallback callback);
+    ~MidiManager();
 
-  bool openDefaultPort();
-  void start();
+    [[nodiscard]] bool openDefaultPort() const;
+    void start();
 
-  void setClockCallback(ClockCallback callback) { clockCallback_ = callback; }
+    void setClockCallback(const ClockCallback &callback) { clockCallback_ = callback; }
 
 private:
-  static void staticCallback(double deltatime,
-                             std::vector<unsigned char> *message,
-                             void *userData);
-  void handleMidiMessage(double deltatime, std::vector<unsigned char> *message);
+    static void staticCallback(double deltatime, std::vector<unsigned char> *message, void *userData);
+    void handleMidiMessage(double deltatime, const std::vector<unsigned char> *message);
 
-  std::unique_ptr<RtMidiIn> midiin_;
-  SyncCallback callback_;
-  ClockCallback clockCallback_;
+    std::unique_ptr<RtMidiIn> midiin_;
+    SyncCallback callback_;
+    ClockCallback clockCallback_;
 
-  float currentBPM_ = 120.0f;
-  float multiplier_ = 1.0f;
-  double clockIntervalSum_ = 0;
-  int clockCount_ = 0;
+    float currentBPM_ = 120.0f;
+    float multiplier_ = 1.0f;
+    double clockIntervalSum_ = 0;
 
-  std::chrono::steady_clock::time_point lastQuarterNoteTime_;
-  bool firstClock_ = true;
-  int validBeats_ = 0;
-};
+    std::deque<long long> tickDeltas_;
+    std::chrono::steady_clock::time_point lastTickTime_;
+    bool firstClock_ = true;
+  };
 
-} // namespace midi
-} // namespace rt
+} // namespace rt::midi

@@ -1,160 +1,167 @@
 #include "midi_manager.hpp"
 #include <chrono>
-#include <cmath>
 #include <iostream>
+#include <numeric>
+#include <utility>
 
-namespace rt {
-namespace midi {
 
-MidiManager::MidiManager(SyncCallback callback) : callback_(callback) {
-  try {
-    midiin_ = std::make_unique<RtMidiIn>();
-  } catch (RtMidiError &error) {
-    error.printMessage();
+namespace rt::midi {
+
+  MidiManager::MidiManager(SyncCallback callback) : callback_(std::move(callback)) {
+    try {
+      midiin_ = std::make_unique<RtMidiIn>();
+    } catch (RtMidiError &error) {
+      error.printMessage();
+    }
   }
-}
 
-MidiManager::~MidiManager() {}
+  MidiManager::~MidiManager() = default;
 
-bool MidiManager::openDefaultPort() {
-  if (!midiin_)
-    return false;
+  bool MidiManager::openDefaultPort() const {
+    if (!midiin_)
+      return false;
 
-  unsigned int nPorts = midiin_->getPortCount();
-  if (nPorts > 0) {
-    unsigned int port = 0;
+    unsigned int nPorts = midiin_->getPortCount();
+    unsigned int portToOpen = -1;
+
+    // 1. Try to find "ReaperSync" if it already exists (e.g. from IAC or other tool)
     for (unsigned int i = 0; i < nPorts; i++) {
       std::string name = midiin_->getPortName(i);
       std::cout << "  " << i << ": " << name << std::endl;
-      if (name.find("IAC") != std::string::npos)
-        port = i;
+      if (name.find("ReaperSync") != std::string::npos) {
+        portToOpen = i;
+        break;
+      }
     }
-    midiin_->openPort(port);
-    std::cout << "[MIDI] Opened: " << midiin_->getPortName(port) << std::endl;
-  } else {
-    midiin_->openVirtualPort("ReaperSync");
-    std::cout << "[MIDI] Opened virtual port: ReaperSync" << std::endl;
-  }
-  return true;
-}
 
-void MidiManager::start() {
-  if (!midiin_)
-    return;
-  midiin_->setCallback(&MidiManager::staticCallback, this);
-  midiin_->ignoreTypes(false, false, false);
-}
-
-void MidiManager::staticCallback(double deltatime,
-                                 std::vector<unsigned char> *message,
-                                 void *userData) {
-  static_cast<MidiManager *>(userData)->handleMidiMessage(deltatime, message);
-}
-
-void MidiManager::handleMidiMessage(double deltatime,
-                                    std::vector<unsigned char> *message) {
-  if (message->empty())
-    return;
-
-  unsigned char statusByte = message->at(0);
-  unsigned char status = statusByte & 0xF0;
-
-  // --- NEW: Handle Transport Start/Continue/Stop ---
-  // 0xFA = Start, 0xFB = Continue, 0xFC = Stop
-  if (statusByte == 0xFA || statusByte == 0xFB || statusByte == 0xFC) {
-    if (clockCallback_)
-      clockCallback_(statusByte);
-    firstClock_ = true;
-    clockCount_ = 0;
-    validBeats_ = 0; // Reset the warm-up period
-    return;
-  }
-
-  // 1. MIDI Clock (0xF8)
-  if (statusByte == 0xF8) {
-    if (clockCallback_)
-      clockCallback_(statusByte);
-    clockCount_++;
-
-    if (clockCount_ >= 24) { // One quarter note
-      auto now = std::chrono::steady_clock::now();
-
-      // Timeout check: If it's been more than 2 seconds since the last beat,
-      // the transport probably stopped. Reset the math.
-      if (!firstClock_) {
-        std::chrono::duration<float> idleTime = now - lastQuarterNoteTime_;
-        if (idleTime.count() > 2.0f) {
-          firstClock_ = true;
-          validBeats_ = 0;
+    // 2. Try to find "IAC" as second priority
+    if (portToOpen == -1) {
+      for (unsigned int i = 0; i < nPorts; i++) {
+        if (midiin_->getPortName(i).find("IAC") != std::string::npos) {
+          portToOpen = i;
+          break;
         }
       }
+    }
 
-      // Ignore the very first calculation to establish a baseline timestamp
+    if (portToOpen != -1) {
+      midiin_->openPort(portToOpen);
+      std::cout << "[MIDI] Opened existing port: " << midiin_->getPortName(portToOpen) << std::endl;
+    } else {
+      // 3. Fallback: Create our own virtual port
+      midiin_->openVirtualPort("ReaperSync");
+      std::cout << "[MIDI] Created virtual port: ReaperSync" << std::endl;
+    }
+
+    return true;
+  }
+
+  void MidiManager::start() {
+    if (!midiin_)
+      return;
+    midiin_->setCallback(&MidiManager::staticCallback, this);
+    midiin_->ignoreTypes(false, false, false);
+  }
+
+  void MidiManager::staticCallback(double deltatime, std::vector<unsigned char> *message, void *userData) {
+    static_cast<MidiManager *>(userData)->handleMidiMessage(deltatime, message);
+  }
+
+  void MidiManager::handleMidiMessage(double deltatime, const std::vector<unsigned char> *message) {
+    if (message->empty())
+      return;
+
+    unsigned char statusByte = message->at(0);
+    unsigned char status = statusByte & 0xF0;
+
+    // --- NEW: Trigger external Clock Callback for Transport (main.cpp) ---
+    if (clockCallback_ && (statusByte == 0xFA || statusByte == 0xFB || statusByte == 0xFC)) {
+      clockCallback_(statusByte);
+    }
+
+    // --- Handle Transport Start/Continue/Stop ---
+    if (statusByte == 0xFA || statusByte == 0xFB || statusByte == 0xFC) {
+      tickDeltas_.clear(); // Wipe the sliding window clean
+      firstClock_ = true;
+      return;
+    }
+
+    // 1. MIDI Clock (0xF8)
+    if (statusByte == 0xF8) {
+      auto now = std::chrono::steady_clock::now();
+
+      // Establish timestamp baseline on the first tick
       if (firstClock_) {
-        lastQuarterNoteTime_ = now;
+        lastTickTime_ = now;
         firstClock_ = false;
-        clockCount_ = 0;
         return;
       }
 
-      // Calculate exact absolute time passed since the last 24th pulse
-      std::chrono::duration<float> elapsed = now - lastQuarterNoteTime_;
-      float rawBpm = 60.0f / elapsed.count();
+      // Calculate exact microseconds since the very last tick
+      long long deltaUs = std::chrono::duration_cast<std::chrono::microseconds>(now - lastTickTime_).count();
+      lastTickTime_ = now;
 
-      // Snap to the nearest 0.5 BPM to kill jitter
-      float snappedBpm = std::round(rawBpm * 2.0f) / 2.0f;
+      // Timeout check: If it's been > 1 second since the last tick, the transport stopped.
+      if (deltaUs > 1000000) {
+        tickDeltas_.clear();
+        return;
+      }
 
-      // Warm-up Period ---
-      // Wait for 2 stable quarter notes before trusting the data
-      if (validBeats_ < 2) {
-        validBeats_++;
-      } else {
-        // Now we are stable, trigger the callback to the mixer
+      // Add to sliding window
+      tickDeltas_.push_back(deltaUs);
+      if (tickDeltas_.size() > 24) { // Keep window size strictly at 1 quarter note
+        tickDeltas_.pop_front();
+      }
+
+      // We can confidently estimate BPM after just 6 ticks (1/16th note)
+      if (tickDeltas_.size() >= 6) {
+        long long sum = std::accumulate(tickDeltas_.begin(), tickDeltas_.end(), 0LL);
+        double avgDelta = static_cast<double>(sum) / tickDeltas_.size();
+
+        // 60 seconds * 1,000,000 microseconds / (24 PPQN * average delta)
+        float rawBpm = 60000000.0f / (24.0f * avgDelta);
+
+        // Snap to integer BPM to kill the remaining USB jitter
+        float snappedBpm = std::round(rawBpm);
+
         if (std::abs(snappedBpm - currentBPM_) > 0.1f) {
           currentBPM_ = snappedBpm;
           if (callback_)
             callback_(currentBPM_, multiplier_);
         }
       }
-
-      // Reset for the next quarter note
-      lastQuarterNoteTime_ = now;
-      clockCount_ = 0;
+      return;
     }
-    return;
-  }
 
-  if (message->size() < 3)
-    return;
-  unsigned char data1 = message->at(1);
-  unsigned char data2 = message->at(2);
+    if (message->size() < 3)
+      return;
+    unsigned char data1 = message->at(1);
+    unsigned char data2 = message->at(2);
 
-  bool changed = false;
+    bool changed = false;
 
-  // 2. Multiplier (Note On)
-  if (status == 0x90 && data2 > 0) {
-    if (data1 == 60) {
-      multiplier_ = 1.0f;
-      changed = true;
-    } else if (data1 == 61) {
-      multiplier_ = 0.5f;
-      changed = true;
-    } else if (data1 == 62) {
-      multiplier_ = 2.0f;
+    // 2. Multiplier (Note On)
+    if (status == 0x90 && data2 > 0) {
+      if (data1 == 60) {
+        multiplier_ = 1.0f;
+        changed = true;
+      } else if (data1 == 61) {
+        multiplier_ = 0.5f;
+        changed = true;
+      } else if (data1 == 62) {
+        multiplier_ = 2.0f;
+        changed = true;
+      }
+    }
+    // 3. CC (Manual Tempo Override)
+    else if (status == 0xB0 && data1 == 20) {
+      currentBPM_ = static_cast<float>(data2) + 60.0f;
       changed = true;
     }
-  }
-  // 3. CC (Manual Tempo Override)
-  else if (status == 0xB0 && data1 == 20) {
-    currentBPM_ = static_cast<float>(data2) + 60.0f;
-    changed = true;
+
+    if (changed && callback_) {
+      callback_(currentBPM_, multiplier_);
+    }
   }
 
-  if (changed && callback_ &&
-      validBeats_ >= 2) { // Only allow changes if warmed up
-    callback_(currentBPM_, multiplier_);
-  }
-}
-
-} // namespace midi
-} // namespace rt
+} // namespace rt::midi

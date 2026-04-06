@@ -8,9 +8,8 @@
 #include <vector>
 
 class Mixer {
-public:
-  Mixer(asio::io_context &io_context, std::string host, std::string port,
-        uint8_t channel, uint16_t parameter);
+  public:
+  Mixer(asio::io_context &io_context, std::string host, std::string port, uint8_t channel, uint16_t parameter);
   ~Mixer();
 
   // Establishes a TCP connection to the mixer
@@ -28,7 +27,7 @@ public:
 
   bool isConnected() const;
 
-private:
+  private:
   asio::io_context &io_context_;
   asio::ip::tcp::socket socket_;
   std::string host_;

@@ -1,71 +1,74 @@
+#include <asio.hpp>
+#include <iostream>
+#include <memory>
 #include "config_loader.hpp"
 #include "midi_manager.hpp"
 #include "mixer.hpp"
 #include "pulse_manager.hpp"
-#include <asio.hpp>
-#include <iostream>
-#include <memory>
 
 int main() {
   try {
     asio::io_context io_context;
-
-    // 1. Load Configuration
     auto config = config::ConfigLoader::load("config.txt");
-    std::cout << "[Config] Mixer Enabled: " << (config.mixerEnabled ? "Yes" : "No") << std::endl;
-    std::cout << "[Config] Pulse Enabled: " << (config.pulseEnabled ? "Yes" : "No") << std::endl;
 
-    // 2. Initialize Mixer (if enabled)
+    std::shared_ptr<PulseManager> pulse;
+    if (config.pulseEnabled) {
+      pulse = std::make_shared<PulseManager>();
+      pulse->startConnection();
+    }
+
     std::shared_ptr<Mixer> mixer;
     if (config.mixerEnabled) {
-      mixer = std::make_shared<Mixer>(io_context, config.mixerIp, config.mixerPort,
-                                      config.midiChannel, config.nrpnParam);
+      mixer = std::make_shared<Mixer>(io_context, config.mixerIp, config.mixerPort, config.midiChannel, config.nrpnParam);
       mixer->startReconnectionThread();
     }
 
-    // 3. Initialize Pulse (if enabled)
-    std::shared_ptr<rt::midi::PulseManager> pulse;
-    if (config.pulseEnabled) {
-      pulse = std::make_shared<rt::midi::PulseManager>();
-      if (!pulse->openPort()) {
-        std::cerr << "[Main] Failed to open Pulse MIDI port. Disabling Pulse." << std::endl;
-        pulse.reset();
-      }
-    }
+    int lastBpm = -1;
+    int currentKnownBpm = 120; // Default fallback
 
-    // 4. Initialize MIDI Manager
-    rt::midi::MidiManager midiManager([&](float bpm, float multiplier) {
-      std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << "x" << std::endl;
+    MidiManager midiManager([&](float bpm, float multiplier) {
+      int current = static_cast<int>(std::round(bpm * multiplier));
+      currentKnownBpm = current; // Continuously track the latest BPM
+
+      if (pulse) {
+        std::cout << "[Main] Clock Change -> Pushing to Pulse: " << current << std::endl;
+        pulse->setBpm(current);
+      }
+
       if (mixer && mixer->isConnected()) {
+        std::cout << "[Main] Clock Change -> Syncing Mixer: " << bpm << " x " << multiplier << std::endl;
         mixer->syncToBPM(bpm, multiplier);
       }
-      if (pulse) {
-        pulse->setBpm(static_cast<int>(bpm));
+      lastBpm = current;
+    });
+
+    midiManager.setClockCallback([pulse, mixer, &currentKnownBpm, &lastBpm](unsigned char status) {
+      if (status == 0xFA || status == 0xFB) { // START or CONTINUE
+        std::cout << "[Transport] START" << std::endl;
+        if (pulse) {
+          // 1. First set the tempo
+          pulse->setBpm(currentKnownBpm);
+          // 2. Then explicitly trigger the play state
+          pulse->sendStart();
+        }
+        if (mixer && mixer->isConnected()) {
+          mixer->syncToBPM(static_cast<float>(currentKnownBpm), 1.0f);
+        }
+        lastBpm = currentKnownBpm;
+      } else if (status == 0xFC) { // STOP
+        std::cout << "[Transport] STOP" << std::endl;
+        if (pulse)
+          pulse->sendStop();
+        lastBpm = -1;
       }
     });
 
-    // 5. Setup Clock Forwarding (Direct handover for lowest latency)
-    if (pulse) {
-      midiManager.setClockCallback([pulse](unsigned char status) {
-        if (status == 0xF8) pulse->sendClock();
-        else if (status == 0xFA || status == 0xFB) pulse->sendStart();
-        else if (status == 0xFC) pulse->sendStop();
-      });
-    }
-
-    // 6. Setup and Start MIDI Input
-    std::cout << "[Main] Setting up MIDI Input..." << std::endl;
-    if (!midiManager.openDefaultPort()) {
-      std::cerr << "[Main] Failed to open MIDI port." << std::endl;
+    if (!midiManager.openDefaultPort())
       return 1;
-    }
     midiManager.start();
-
-    std::cout << "[Main] System Active. Waiting for MIDI data..." << std::endl;
 
     auto work = asio::make_work_guard(io_context);
     io_context.run();
-
   } catch (const std::exception &e) {
     std::cerr << "[Main] Fatal Error: " << e.what() << std::endl;
     return 1;

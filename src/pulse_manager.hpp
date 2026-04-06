@@ -2,24 +2,21 @@
 #include <memory>
 #include <vector>
 
-namespace rt {
-namespace midi {
+namespace rt::midi {
 
-class PulseManager {
+  class PulseManager {
 public:
-  PulseManager();
-  ~PulseManager();
+    PulseManager();
+    ~PulseManager();
 
-  bool openPort();
-  void setBpm(int bpm);
-  void sendClock();
-  void sendStart();
-  void sendStop();
+    void startConnection() const;
+    void setBpm(int bpm) const;
+    void sendStart() const;
+    void sendStop() const;
 
 private:
-  struct Impl;
-  Impl* impl_;
-};
+    struct Impl;
+    Impl *impl_;
+  };
 
-} // namespace midi
-} // namespace rt
+} // namespace rt::midi

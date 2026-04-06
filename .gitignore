@@ -28,6 +28,8 @@ compile_commands.json
 # Cache
 .cache/
 
+libs/
+
 # Submodules (libs/rtmidi is a submodule, so it should be managed via .gitmodules)
 # But we keep the folder structure
 # libs/rtmidi/ is handled by git submodule

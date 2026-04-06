@@ -4,10 +4,8 @@
 #include <iostream>
 #include <thread>
 
-Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port,
-             uint8_t channel, uint16_t parameter)
-    : io_context_(io_context), socket_(io_context), host_(host), port_(port),
-      midiChannel_(channel), parameter_(parameter) {}
+Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port, uint8_t channel, uint16_t parameter) :
+    io_context_(io_context), socket_(io_context), host_(host), port_(port), midiChannel_(channel), parameter_(parameter) {}
 
 Mixer::~Mixer() {
   if (reconnectThread_ && reconnectThread_->joinable()) {
@@ -25,10 +23,7 @@ void Mixer::connect() {
   std::cout << "[Mixer] Connected to " << host_ << ":" << port_ << std::endl;
 }
 
-void Mixer::startReconnectionThread() {
-  reconnectThread_ =
-      std::make_unique<std::thread>(&Mixer::runReconnectLoop, this);
-}
+void Mixer::startReconnectionThread() { reconnectThread_ = std::make_unique<std::thread>(&Mixer::runReconnectLoop, this); }
 
 void Mixer::runReconnectLoop() {
   while (true) {
@@ -37,8 +32,7 @@ void Mixer::runReconnectLoop() {
         connect();
       } catch (const std::exception &e) {
         connected_ = false;
-        std::cerr << "[Mixer] Connection failed: " << e.what()
-                  << ". Retrying in 3s..." << std::endl;
+        std::cerr << "[Mixer] Connection failed: " << e.what() << ". Retrying in 3s..." << std::endl;
       }
     }
     std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -60,15 +54,14 @@ void Mixer::sendNrpn(uint8_t midiChannel, uint16_t parameter, uint16_t value) {
 
   uint8_t status = 0xB0 | (midiChannel & 0x0F);
 
-  std::vector<uint8_t> midiMsg = {status, 99, pMsb, status, 98, pLsb,
-                                  status, 6,  vMsb, status, 38, vLsb};
+  std::vector<uint8_t> midiMsg = {status, 99, pMsb, status, 98, pLsb, status, 6, vMsb, status, 38, vLsb};
 
   std::vector<uint8_t> tcpPacket;
   tcpPacket.reserve(4 + midiMsg.size());
-  tcpPacket.push_back(0xF0);           // Encapsulation Start
-  tcpPacket.push_back(0x02);           // Data Type: MIDI
+  tcpPacket.push_back(0xF0); // Encapsulation Start
+  tcpPacket.push_back(0x02); // Data Type: MIDI
   tcpPacket.push_back(midiMsg.size()); // Length (12)
-  tcpPacket.push_back(0x1F);           // Header End
+  tcpPacket.push_back(0x1F); // Header End
   tcpPacket.insert(tcpPacket.end(), midiMsg.begin(), midiMsg.end());
 
   try {
@@ -84,14 +77,12 @@ void Mixer::syncToBPM(float bpm, float multiplier) {
     return;
 
   float ms = 60000.0f / (bpm * multiplier);
-  const float MAX_DELAY_MS = 2000.0f;
+  constexpr float MAX_DELAY_MS = 2000.0f;
   float scaledValue = (ms / MAX_DELAY_MS) * 16383.0f;
 
-  uint16_t nrpnValue =
-      static_cast<uint16_t>(std::clamp(scaledValue, 0.0f, 16383.0f));
+  uint16_t nrpnValue = static_cast<uint16_t>(std::clamp(scaledValue, 0.0f, 16383.0f));
 
-  std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier
-            << " -> Delay: " << ms << "ms -> NRPN: " << nrpnValue << std::endl;
+  std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << " -> Delay: " << ms << "ms -> NRPN: " << nrpnValue << std::endl;
 
   if (isConnected()) {
     sendNrpn(midiChannel_, parameter_, nrpnValue);
