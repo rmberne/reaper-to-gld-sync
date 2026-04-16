@@ -9,6 +9,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # This ensures the binary contains both ARM (M1/M2) and Intel (x86_64) slices.
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build architectures for macOS" FORCE)
 
+add_definitions(-DLINK_PLATFORM_MACOSX=1)
+
 # 2. Add RtMidi as a sub-project
 # We disable shared libraries to force static linking of RtMidi
 set(RTMIDI_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -25,11 +27,15 @@ add_executable(${PROJECT_NAME}
     src/midi_manager.hpp
     src/config_loader.cpp
     src/config_loader.hpp
+    src/pulse_manager.cpp
+    src/pulse_manager.hpp
 )
 
 # 4. Include paths
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_SOURCE_DIR}/libs/rtmidi
+    ${CMAKE_SOURCE_DIR}/libs/link/include
+    ${CMAKE_SOURCE_DIR}/libs/link/modules/asio-standalone/asio/include
     /opt/homebrew/include
 )
 
@@ -49,3 +55,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
     COMMENT "Verifying binary architectures..."
 )
+
+# 6. Tests
+add_executable(test_config tests/test_config.cpp src/config_loader.cpp)
+target_include_directories(test_config PRIVATE src)
