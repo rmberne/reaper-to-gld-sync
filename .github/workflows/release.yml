@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install Dependencies
+      run: brew install asio
+
+    - name: Configure CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Package
+      run: |
+        cd build
+        zip -j reaper_gld_sync_macos_${{ github.ref_name }}.zip reaper_gld_sync
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/reaper_gld_sync_macos_${{ github.ref_name }}.zip
+        generate_release_notes: true
+        draft: false
+        prerelease: false
