@@ -21,10 +21,10 @@ namespace rt::midi {
     if (!midiin_)
       return false;
 
-    unsigned int nPorts = midiin_->getPortCount();
+    const unsigned int nPorts = midiin_->getPortCount();
     unsigned int portToOpen = -1;
 
-    // 1. Try to find "ReaperSync" if it already exists (e.g. from IAC or other tool)
+    // 1. Try to find "ReaperSync" if it already exists (e.g. from IAC or another tool)
     for (unsigned int i = 0; i < nPorts; i++) {
       std::string name = midiin_->getPortName(i);
       std::cout << "  " << i << ": " << name << std::endl;
@@ -34,7 +34,7 @@ namespace rt::midi {
       }
     }
 
-    // 2. Try to find "IAC" as second priority
+    // 2. Try to find "IAC" as a second priority
     if (portToOpen == -1) {
       for (unsigned int i = 0; i < nPorts; i++) {
         if (midiin_->getPortName(i).find("IAC") != std::string::npos) {
@@ -71,8 +71,8 @@ namespace rt::midi {
     if (message->empty())
       return;
 
-    unsigned char statusByte = message->at(0);
-    unsigned char status = statusByte & 0xF0;
+    const unsigned char statusByte = message->at(0);
+    const unsigned char status = statusByte & 0xF0;
 
     // --- NEW: Trigger external Clock Callback for Transport (main.cpp) ---
     if (clockCallback_ && (statusByte == 0xFA || statusByte == 0xFB || statusByte == 0xFC)) {
@@ -88,7 +88,7 @@ namespace rt::midi {
 
     // 1. MIDI Clock (0xF8)
     if (statusByte == 0xF8) {
-      auto now = std::chrono::steady_clock::now();
+      const auto now = std::chrono::steady_clock::now();
 
       // Establish timestamp baseline on the first tick
       if (firstClock_) {
@@ -98,7 +98,7 @@ namespace rt::midi {
       }
 
       // Calculate exact microseconds since the very last tick
-      long long deltaUs = std::chrono::duration_cast<std::chrono::microseconds>(now - lastTickTime_).count();
+      const long long deltaUs = std::chrono::duration_cast<std::chrono::microseconds>(now - lastTickTime_).count();
       lastTickTime_ = now;
 
       // Timeout check: If it's been > 1 second since the last tick, the transport stopped.
@@ -115,16 +115,15 @@ namespace rt::midi {
 
       // We can confidently estimate BPM after just 6 ticks (1/16th note)
       if (tickDeltas_.size() >= 6) {
-        long long sum = std::accumulate(tickDeltas_.begin(), tickDeltas_.end(), 0LL);
-        double avgDelta = static_cast<double>(sum) / tickDeltas_.size();
+        const long long sum = std::accumulate(tickDeltas_.begin(), tickDeltas_.end(), 0LL);
+        const double avgDelta = static_cast<double>(sum) / tickDeltas_.size();
 
         // 60 seconds * 1,000,000 microseconds / (24 PPQN * average delta)
-        float rawBpm = 60000000.0f / (24.0f * avgDelta);
+        const float rawBpm = 60000000.0f / (24.0f * avgDelta);
 
         // Snap to integer BPM to kill the remaining USB jitter
-        float snappedBpm = std::round(rawBpm);
 
-        if (std::abs(snappedBpm - currentBPM_) > 0.1f) {
+        if (const float snappedBpm = std::round(rawBpm); std::abs(snappedBpm - currentBPM_) > 0.1f) {
           currentBPM_ = snappedBpm;
           if (callback_)
             callback_(currentBPM_, multiplier_);
@@ -135,8 +134,8 @@ namespace rt::midi {
 
     if (message->size() < 3)
       return;
-    unsigned char data1 = message->at(1);
-    unsigned char data2 = message->at(2);
+    const unsigned char data1 = message->at(1);
+    const unsigned char data2 = message->at(2);
 
     bool changed = false;
 

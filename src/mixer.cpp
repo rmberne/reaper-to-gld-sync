@@ -3,9 +3,10 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port, uint8_t channel, uint16_t parameter) :
-    io_context_(io_context), socket_(io_context), host_(host), port_(port), midiChannel_(channel), parameter_(parameter) {}
+    io_context_(io_context), socket_(io_context), host_(std::move(host)), port_(std::move(port)), midiChannel_(channel), parameter_(parameter) {}
 
 Mixer::~Mixer() {
   if (reconnectThread_ && reconnectThread_->joinable()) {
@@ -17,7 +18,7 @@ Mixer::~Mixer() {
 void Mixer::connect() {
   closeSocketIfOpen();
   asio::ip::tcp::resolver resolver(io_context_);
-  auto endpoints = resolver.resolve(host_, port_);
+  const auto endpoints = resolver.resolve(host_, port_);
   asio::connect(socket_, endpoints);
   connected_ = true;
   std::cout << "[Mixer] Connected to " << host_ << ":" << port_ << std::endl;
@@ -41,18 +42,18 @@ void Mixer::runReconnectLoop() {
 
 bool Mixer::isConnected() const { return connected_ && socket_.is_open(); }
 
-void Mixer::sendNrpn(uint8_t midiChannel, uint16_t parameter, uint16_t value) {
+void Mixer::sendNrpn(const uint8_t midiChannel, const uint16_t parameter, const uint16_t value) {
   if (!socket_.is_open()) {
     std::cerr << "[Mixer] Error: Socket is not open." << std::endl;
     return;
   }
 
-  uint8_t pMsb = (parameter >> 7) & 0x7F;
-  uint8_t pLsb = parameter & 0x7F;
-  uint8_t vMsb = (value >> 7) & 0x7F;
-  uint8_t vLsb = value & 0x7F;
+  const uint8_t pMsb = (parameter >> 7) & 0x7F;
+  const uint8_t pLsb = parameter & 0x7F;
+  const uint8_t vMsb = (value >> 7) & 0x7F;
+  const uint8_t vLsb = value & 0x7F;
 
-  uint8_t status = 0xB0 | (midiChannel & 0x0F);
+  const uint8_t status = 0xB0 | (midiChannel & 0x0F);
 
   std::vector<uint8_t> midiMsg = {status, 99, pMsb, status, 98, pLsb, status, 6, vMsb, status, 38, vLsb};
 
@@ -72,15 +73,15 @@ void Mixer::sendNrpn(uint8_t midiChannel, uint16_t parameter, uint16_t value) {
   }
 }
 
-void Mixer::syncToBPM(float bpm, float multiplier) {
+void Mixer::syncToBPM(const float bpm, const float multiplier) {
   if (bpm <= 0.0f)
     return;
 
-  float ms = 60000.0f / (bpm * multiplier);
+  const float ms = 60000.0f / (bpm * multiplier);
   constexpr float MAX_DELAY_MS = 2000.0f;
-  float scaledValue = (ms / MAX_DELAY_MS) * 16383.0f;
+  const float scaledValue = (ms / MAX_DELAY_MS) * 16383.0f;
 
-  uint16_t nrpnValue = static_cast<uint16_t>(std::clamp(scaledValue, 0.0f, 16383.0f));
+  const uint16_t nrpnValue = static_cast<uint16_t>(std::clamp(scaledValue, 0.0f, 16383.0f));
 
   std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << " -> Delay: " << ms << "ms -> NRPN: " << nrpnValue << std::endl;
 

@@ -9,25 +9,25 @@
 int main() {
   try {
     asio::io_context io_context;
-    auto config = config::ConfigLoader::load("config.txt");
+    auto [mixerIp, mixerPort, midiChannel, nrpnParam, mixerEnabled, pulseEnabled] = config::ConfigLoader::load("config.txt");
 
     std::shared_ptr<PulseManager> pulse;
-    if (config.pulseEnabled) {
+    if (pulseEnabled) {
       pulse = std::make_shared<PulseManager>();
       pulse->startConnection();
     }
 
     std::shared_ptr<Mixer> mixer;
-    if (config.mixerEnabled) {
-      mixer = std::make_shared<Mixer>(io_context, config.mixerIp, config.mixerPort, config.midiChannel, config.nrpnParam);
+    if (mixerEnabled) {
+      mixer = std::make_shared<Mixer>(io_context, mixerIp, mixerPort, midiChannel, nrpnParam);
       mixer->startReconnectionThread();
     }
 
     int lastBpm = -1;
     int currentKnownBpm = 120; // Default fallback
 
-    MidiManager midiManager([&](float bpm, float multiplier) {
-      int current = static_cast<int>(std::round(bpm * multiplier));
+    MidiManager midiManager([&](const float bpm, const float multiplier) {
+      const int current = static_cast<int>(std::round(bpm * multiplier));
       currentKnownBpm = current; // Continuously track the latest BPM
 
       if (pulse) {
@@ -42,7 +42,7 @@ int main() {
       lastBpm = current;
     });
 
-    midiManager.setClockCallback([pulse, mixer, &currentKnownBpm, &lastBpm](unsigned char status) {
+    midiManager.setClockCallback([pulse, mixer, &currentKnownBpm, &lastBpm](const unsigned char status) {
       if (status == 0xFA || status == 0xFB) { // START or CONTINUE
         std::cout << "[Transport] START" << std::endl;
         if (pulse) {

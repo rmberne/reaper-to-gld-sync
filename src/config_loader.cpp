@@ -19,10 +19,8 @@ Config ConfigLoader::load(const std::string &filename) {
     line.erase(line.find_last_not_of(" \n\r\t") + 1);
 
     std::istringstream is_line(line);
-    std::string key;
-    if (std::getline(is_line, key, '=')) {
-      std::string value;
-      if (std::getline(is_line, value)) {
+    if (std::string key; std::getline(is_line, key, '=')) {
+      if (std::string value; std::getline(is_line, value)) {
         try {
           if (key == "IP")
             config.mixerIp = value;

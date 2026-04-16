@@ -16,7 +16,7 @@ namespace rt::midi {
       // This tells the Link SDK to actually broadcast our Start/Stop commands to the Soundbrenner App
       link.enableStartStopSync(true);
 
-      link.setNumPeersCallback([this](std::size_t num) {
+      link.setNumPeersCallback([this](const std::size_t num) {
         if (num > 0) {
           std::cout << "\n[Pulse Link] PEER FOUND. Synchronizing..." << std::endl;
 
@@ -35,9 +35,9 @@ namespace rt::midi {
   PulseManager::PulseManager() : impl_(new Impl()) {}
   PulseManager::~PulseManager() { delete impl_; }
 
-  void PulseManager::startConnection() const { std::cout << "[Pulse Link] Engine running. Waiting for Soundbrenner App..." << std::endl; }
+  void PulseManager::startConnection() { std::cout << "[Pulse Link] Engine running. Waiting for Soundbrenner App..." << std::endl; }
 
-  void PulseManager::setBpm(int bpm) const {
+  void PulseManager::setBpm(const int bpm) const {
     if (bpm <= 0)
       return;
     impl_->lastBpm = static_cast<double>(bpm);

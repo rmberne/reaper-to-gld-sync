@@ -13,7 +13,7 @@ public:
     using SyncCallback = std::function<void(float bpm, float multiplier)>;
     using ClockCallback = std::function<void(unsigned char status)>;
 
-    MidiManager(SyncCallback callback);
+    explicit MidiManager(SyncCallback callback);
     ~MidiManager();
 
     [[nodiscard]] bool openDefaultPort() const;
