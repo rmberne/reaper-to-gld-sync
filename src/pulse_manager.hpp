@@ -9,7 +9,7 @@ public:
     PulseManager();
     ~PulseManager();
 
-    static void startConnection();
+    void startConnection();
     void setBpm(int bpm) const;
     void sendStart() const;
     void sendStop() const;

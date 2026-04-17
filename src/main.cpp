@@ -1,6 +1,7 @@
 #include <asio.hpp>
 #include <iostream>
 #include <memory>
+#include "arduino_manager.hpp"
 #include "config_loader.hpp"
 #include "midi_manager.hpp"
 #include "mixer.hpp"
@@ -9,17 +10,17 @@
 int main() {
   try {
     asio::io_context io_context;
-    auto [mixerIp, mixerPort, midiChannel, nrpnParam, mixerEnabled, pulseEnabled] = config::ConfigLoader::load("config.txt");
+    const auto cfg = config::ConfigLoader::load("config.txt");
 
     std::shared_ptr<PulseManager> pulse;
-    if (pulseEnabled) {
+    if (cfg.pulseEnabled) {
       pulse = std::make_shared<PulseManager>();
       pulse->startConnection();
     }
 
     std::shared_ptr<Mixer> mixer;
-    if (mixerEnabled) {
-      mixer = std::make_shared<Mixer>(io_context, mixerIp, mixerPort, midiChannel, nrpnParam);
+    if (cfg.mixerEnabled) {
+      mixer = std::make_shared<Mixer>(io_context, cfg.mixerIp, cfg.mixerPort, cfg.midiChannel, cfg.nrpnParam);
       mixer->startReconnectionThread();
     }
 
@@ -66,6 +67,14 @@ int main() {
     if (!midiManager.openDefaultPort())
       return 1;
     midiManager.start();
+
+    // ReSharper disable once CppTooWideScope
+    std::shared_ptr<rt::arduino::ArduinoManager> arduino;
+    if (cfg.arduinoEnabled) {
+      arduino = std::make_shared<rt::arduino::ArduinoManager>(io_context, cfg.arduinoPort,
+                                                              [&](const std::vector<unsigned char> &msg) { midiManager.sendMidiMessage(msg); });
+      arduino->start();
+    }
 
     auto work = asio::make_work_guard(io_context);
     io_context.run();

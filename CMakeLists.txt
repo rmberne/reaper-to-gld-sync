@@ -29,6 +29,8 @@ add_executable(${PROJECT_NAME}
     src/config_loader.hpp
     src/pulse_manager.cpp
     src/pulse_manager.hpp
+    src/arduino_manager.cpp
+    src/arduino_manager.hpp
 )
 
 # 4. Include paths

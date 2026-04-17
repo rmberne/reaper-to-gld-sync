@@ -11,6 +11,8 @@ struct Config {
   uint16_t nrpnParam = (0x42 << 7) | 0x01; // Slot 3, Param 1 (Time)
   bool mixerEnabled = true;
   bool pulseEnabled = false;
+  bool arduinoEnabled = false;
+  std::string arduinoPort = "/dev/tty.usbmodem14101";
 };
 
 class ConfigLoader {

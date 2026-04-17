@@ -34,6 +34,10 @@ Config ConfigLoader::load(const std::string &filename) {
             config.mixerEnabled = (value == "true" || value == "1");
           else if (key == "PULSE_ENABLED")
             config.pulseEnabled = (value == "true" || value == "1");
+          else if (key == "ARDUINO_ENABLED")
+            config.arduinoEnabled = (value == "true" || value == "1");
+          else if (key == "ARDUINO_PORT")
+            config.arduinoPort = value;
         } catch (const std::exception &e) {
           std::cerr << "[Config] Error parsing line '" << line
                     << "': " << e.what() << std::endl;

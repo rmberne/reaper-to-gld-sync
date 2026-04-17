@@ -21,11 +21,14 @@ public:
 
     void setClockCallback(const ClockCallback &callback) { clockCallback_ = callback; }
 
+    void sendMidiMessage(const std::vector<unsigned char>& message) const;
+
 private:
     static void staticCallback(double deltatime, std::vector<unsigned char> *message, void *userData);
     void handleMidiMessage(double deltatime, const std::vector<unsigned char> *message);
 
     std::unique_ptr<RtMidiIn> midiin_;
+    std::unique_ptr<RtMidiOut> midiout_;
     SyncCallback callback_;
     ClockCallback clockCallback_;
 

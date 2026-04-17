@@ -10,6 +10,7 @@ namespace rt::midi {
   MidiManager::MidiManager(SyncCallback callback) : callback_(std::move(callback)) {
     try {
       midiin_ = std::make_unique<RtMidiIn>();
+      midiout_ = std::make_unique<RtMidiOut>();
     } catch (RtMidiError &error) {
       error.printMessage();
     }
@@ -18,42 +19,76 @@ namespace rt::midi {
   MidiManager::~MidiManager() = default;
 
   bool MidiManager::openDefaultPort() const {
-    if (!midiin_)
+    if (!midiin_ || !midiout_)
       return false;
 
-    const unsigned int nPorts = midiin_->getPortCount();
-    unsigned int portToOpen = -1;
+    // --- MIDI Input Port Setup (C++ listens here) ---
+    const unsigned int nInPorts = midiin_->getPortCount();
+    bool inFound = false;
 
-    // 1. Try to find "ReaperSync" if it already exists (e.g. from IAC or another tool)
-    for (unsigned int i = 0; i < nPorts; i++) {
-      std::string name = midiin_->getPortName(i);
-      std::cout << "  " << i << ": " << name << std::endl;
-      if (name.find("ReaperSync") != std::string::npos) {
-        portToOpen = i;
+    for (unsigned int i = 0; i < nInPorts; i++) {
+      if (std::string name = midiin_->getPortName(i); name.find("ReaperSync IN") != std::string::npos) {
+        midiin_->openPort(i);
+        std::cout << "[MIDI] Opened existing input port: " << name << std::endl;
+        inFound = true;
         break;
       }
     }
 
-    // 2. Try to find "IAC" as a second priority
-    if (portToOpen == -1) {
-      for (unsigned int i = 0; i < nPorts; i++) {
-        if (midiin_->getPortName(i).find("IAC") != std::string::npos) {
-          portToOpen = i;
-          break;
-        }
+    if (!inFound) {
+      try {
+        midiin_->openVirtualPort("ReaperSync IN");
+        std::cout << "[MIDI] Created virtual input port: ReaperSync IN" << std::endl;
+        inFound = true;
+      } catch (RtMidiError &error) {
+        // ... fallback to IAC ...
       }
     }
 
-    if (portToOpen != -1) {
-      midiin_->openPort(portToOpen);
-      std::cout << "[MIDI] Opened existing port: " << midiin_->getPortName(portToOpen) << std::endl;
-    } else {
-      // 3. Fallback: Create our own virtual port
-      midiin_->openVirtualPort("ReaperSync");
-      std::cout << "[MIDI] Created virtual port: ReaperSync" << std::endl;
+    // --- MIDI Output Port Setup (C++ talks here) ---
+    const unsigned int nOutPorts = midiout_->getPortCount();
+    bool outFound = false;
+
+    for (unsigned int i = 0; i < nOutPorts; i++) {
+      if (std::string name = midiout_->getPortName(i); name.find("ReaperSync OUT") != std::string::npos) {
+        midiout_->openPort(i);
+        std::cout << "[MIDI] Opened existing output port: " << name << std::endl;
+        outFound = true;
+        break;
+      }
     }
 
-    return true;
+    if (!outFound) {
+      try {
+        midiout_->openVirtualPort("ReaperSync OUT");
+        std::cout << "[MIDI] Created virtual output port: ReaperSync OUT" << std::endl;
+        outFound = true;
+      } catch (RtMidiError &error) {
+        // ... fallback to IAC ...
+      }
+    }
+
+    return inFound && outFound;
+  }
+
+  void MidiManager::sendMidiMessage(const std::vector<unsigned char> &message) const {
+    if (!midiout_) {
+      std::cerr << "[MIDI OUT] Failed: midiout_ pointer is null!" << std::endl;
+      return;
+    }
+
+    // Mac/CoreMIDI Quirk: Virtual ports sometimes report as "not open".
+    // We log it as a warning but attempt to send it anyway!
+    if (!midiout_->isPortOpen()) {
+      std::cout << "[MIDI OUT] Warning: isPortOpen() returned false, sending anyway..." << std::endl;
+    }
+
+    try {
+      midiout_->sendMessage(&message);
+
+    } catch (const RtMidiError &error) {
+      std::cerr << "[MIDI OUT] RtMidi Error: " << error.getMessage() << std::endl;
+    }
   }
 
   void MidiManager::start() {
