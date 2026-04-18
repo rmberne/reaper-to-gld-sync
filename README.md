@@ -1,49 +1,61 @@
-# Reaper to GLD Sync
+# ReaperSync
 
-Sync MIDI clock from Reaper (or any DAW) to Allen & Heath GLD delay parameter.
+A lightweight macOS Menu Bar app designed for live drummers to synchronize Reaper project tempo with hardware and receive commands via an Arduino controller.
 
-This utility listens for MIDI Clock (0xF8) or specific MIDI CC/Note messages from your DAW and translates them into MIDI NRPN messages that the A&H GLD mixer understands to synchronize its delay effects.
+## Main Functionalities
+
+1. **Allen & Heath GLD Sync**: Sends Reaper project tempo to a delay effect in an A&H GLD mixer via MIDI NRPN messages over TCP/IP.
+2. **Soundbrenner Pulse Sync**: Sends Reaper project tempo to the Soundbrenner Pulse app/wearable using Ableton Link.
+3. **Arduino Controller**: Receives serial commands from an Arduino to trigger Reaper actions (e.g., Play/Stop, Next/Previous Tab, Mute Backing Tracks).
 
 ## Features
 
-- **High Precision Sync**: Uses absolute timestamps and a snapping algorithm to eliminate USB/OS jitter, ensuring a rock-solid BPM reading.
-- **Auto-Reconnection**: Automatically attempts to connect to the mixer's IP and handles hardware power cycles or network interruptions gracefully in the background.
-- **Hybrid Support**: Built as a macOS Universal Binary (`arm64` + `x86_64`) to run on both modern Apple Silicon and older Intel Macs.
-- **Multiple Control Methods**:
-  - **MIDI Clock**: Automatic BPM detection from Reaper's MIDI output.
-  - **MIDI CC 20**: Manual tempo override (60-187 BPM).
-  - **MIDI Notes**: Multiplier control (Note 60 = 1x, 61 = 0.5x, 62 = 2x).
+- **macOS Menu Bar App**: Runs discreetly in the system menu bar (🥁 icon).
+- **Native Preferences**: Configure all settings (IPs, Ports, MIDI Channels) through a native macOS Preferences window (using `NSUserDefaults`).
+- **High Precision Sync**: Uses a sliding window and snapping algorithm to eliminate USB/OS jitter, ensuring a rock-solid BPM reading.
+- **Auto-Reconnection**: Automatically attempts to reconnect to the mixer or Arduino in the background.
+- **Universal Binary**: Supports both Apple Silicon (`arm64`) and Intel (`x86_64`) Macs.
+- **Asynchronous Logging**: Integrated `spdlog` for efficient, rotating file logging.
 
-## Setup
+## Control Methods
 
-1. **Configuration**:
-   Create a `config.txt` file in the same directory as the executable to customize settings. If no file is found, the application uses the defaults shown below:
+- **MIDI Clock**: Automatic BPM detection from Reaper's MIDI output.
+- **MIDI CC 20**: Manual tempo override (60-187 BPM).
+- **MIDI Notes**: Multiplier control (Note 60 = 1x, 61 = 0.5x, 62 = 2x).
+- **Arduino Commands**:
+  - `s`: Start / Stop (CC 100)
+  - `m`: Mute Tracks Toggle (CC 102)
+  - `n`: Next Tab (CC 103)
+  - `p`: Previous Tab (CC 104)
 
-   ```ini
-   IP=192.168.1.10
-   PORT=51325
-   CHANNEL=0
-   PARAMETER=8449
-   ```
+## Setup & Configuration
 
-   - **IP/PORT**: The network address of your GLD mixer.
-   - **CHANNEL**: MIDI Channel (0-15).
-   - **PARAMETER**: The 14-bit NRPN parameter ID. (Default `8449` = FX Slot 3, Param 1/Time).
-
-2. **DAW Configuration (Reaper)**:
+1. **Launch**: Start `ReaperSync.app`. A drum icon (🥁) will appear in your menu bar.
+2. **Preferences**: Click the 🥁 icon and select **Preferences...** to configure:
+   - Arduino Port (auto-detection supported)
+   - Mixer IP and Port
+   - MIDI Channel and NRPN Parameter for the GLD delay
+   - Enable/Disable specific modules (Arduino, Pulse, Mixer)
+3. **Reaper Configuration**:
    - Go to `Preferences > MIDI Devices`.
-   - Enable your MIDI output (e.g., "IAC Driver" or the virtual "ReaperSync" port created by this app).
+   - Enable your MIDI output (e.g., the virtual "ReaperSync" port created by this app).
    - Right-click the output and check **"Send clock to this device"**.
-
-3. **Build**:
-   ```bash
-   mkdir build && cd build
-   cmake ..
-   make
-   ```
+   - (Optional) Map the CC messages from the Arduino to actions in Reaper.
 
 ## Requirements
 
-- macOS (CoreMIDI/CoreAudio frameworks)
-- [Asio](https://think-async.com/Asio/) (header-only, included via Homebrew)
+- macOS (AppKit, CoreMIDI, CoreAudio frameworks)
+- [Asio](https://think-async.com/Asio/) (installed via Homebrew: `brew install asio`)
 - [RtMidi](https://github.com/thestk/rtmidi) (included as a submodule)
+- [Ableton Link](https://github.com/Ableton/link) (included in `libs/link`)
+- [spdlog](https://github.com/gabime/spdlog) (fetched automatically via CMake)
+
+## Build
+
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+```
+
+The build will produce a `reaper_gld_sync.app` bundle in the `build` directory.
