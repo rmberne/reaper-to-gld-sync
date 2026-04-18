@@ -18,9 +18,15 @@ set(RTMIDI_API_CORE ON CACHE BOOL "" FORCE)
 set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(libs/rtmidi EXCLUDE_FROM_ALL)
 
+# Enable Objective-C++
+enable_language(OBJCXX)
+
 # 3. Define our executable
 add_executable(${PROJECT_NAME}
-    src/main.cpp
+    MACOSX_BUNDLE
+    src/main.mm
+    src/engine.cpp
+    src/engine.hpp
     src/mixer.cpp
     src/mixer.hpp
     src/midi_manager.cpp
@@ -31,6 +37,11 @@ add_executable(${PROJECT_NAME}
     src/pulse_manager.hpp
     src/arduino_manager.cpp
     src/arduino_manager.hpp
+)
+
+# Set bundle properties to run as a Menu Bar app (LSUIElement)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in
 )
 
 # 4. Include paths
@@ -46,6 +57,9 @@ find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE 
     Threads::Threads
     rtmidi
+    "-framework AppKit"
+    "-framework Foundation"
+    "-framework Cocoa"
     "-framework CoreMIDI"
     "-framework CoreAudio"
     "-framework CoreFoundation"

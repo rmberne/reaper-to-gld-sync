@@ -9,9 +9,7 @@ Mixer::Mixer(asio::io_context &io_context, std::string host, std::string port, u
     io_context_(io_context), socket_(io_context), host_(std::move(host)), port_(std::move(port)), midiChannel_(channel), parameter_(parameter) {}
 
 Mixer::~Mixer() {
-  if (reconnectThread_ && reconnectThread_->joinable()) {
-    reconnectThread_->detach();
-  }
+  stopReconnectionThread();
   closeSocketIfOpen();
 }
 
@@ -24,19 +22,37 @@ void Mixer::connect() {
   std::cout << "[Mixer] Connected to " << host_ << ":" << port_ << std::endl;
 }
 
-void Mixer::startReconnectionThread() { reconnectThread_ = std::make_unique<std::thread>(&Mixer::runReconnectLoop, this); }
+void Mixer::startReconnectionThread() {
+  if (running_) return;
+  running_ = true;
+  reconnectThread_ = std::make_unique<std::thread>(&Mixer::runReconnectLoop, this);
+}
+
+void Mixer::stopReconnectionThread() {
+  running_ = false;
+  if (reconnectThread_ && reconnectThread_->joinable()) {
+    reconnectThread_->join();
+    reconnectThread_.reset();
+  }
+}
 
 void Mixer::runReconnectLoop() {
-  while (true) {
+  while (running_) {
     if (!isConnected()) {
       try {
         connect();
       } catch (const std::exception &e) {
         connected_ = false;
-        std::cerr << "[Mixer] Connection failed: " << e.what() << ". Retrying in 3s..." << std::endl;
+        if (running_) {
+          std::cerr << "[Mixer] Connection failed: " << e.what() << ". Retrying in 3s..." << std::endl;
+        }
       }
     }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // Sleep in small increments to respond quickly to shutdown
+    for (int i = 0; i < 30 && running_; ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
   }
 }
 
@@ -94,6 +110,7 @@ void Mixer::closeSocketIfOpen() {
   if (socket_.is_open()) {
     try {
       socket_.close();
+      connected_ = false;
     } catch (...) {
     }
   }

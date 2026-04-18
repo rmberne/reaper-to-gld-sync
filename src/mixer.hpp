@@ -24,6 +24,8 @@ class Mixer {
 
   // Starts a background thread that ensures the mixer stays connected
   void startReconnectionThread();
+  void stopReconnectionThread();
+  void closeSocketIfOpen();
 
   bool isConnected() const;
 
@@ -35,7 +37,7 @@ class Mixer {
   uint8_t midiChannel_;
   uint16_t parameter_;
   std::atomic<bool> connected_{false};
+  std::atomic<bool> running_{false};
   std::unique_ptr<std::thread> reconnectThread_;
   void runReconnectLoop();
-  void closeSocketIfOpen();
 };
