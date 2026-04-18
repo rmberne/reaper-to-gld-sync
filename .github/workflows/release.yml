@@ -28,7 +28,7 @@ jobs:
     - name: Package
       run: |
         cd build
-        zip -j reaper_gld_sync_macos_${{ github.ref_name }}.zip reaper_gld_sync
+        zip -r reaper_gld_sync_macos_${{ github.ref_name }}.zip reaper_gld_sync.app
 
     - name: Create Release
       uses: softprops/action-gh-release@v1

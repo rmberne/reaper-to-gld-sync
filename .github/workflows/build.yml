@@ -25,4 +25,4 @@ jobs:
       run: cmake --build build --config Release
 
     - name: Verify Universal Binary
-      run: lipo -info build/reaper_gld_sync
+      run: lipo -info build/reaper_gld_sync.app/Contents/MacOS/reaper_gld_sync
