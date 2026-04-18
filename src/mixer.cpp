@@ -1,7 +1,7 @@
 #include "mixer.hpp"
 #include <algorithm>
 #include <chrono>
-#include <iostream>
+#include <spdlog/spdlog.h>
 #include <thread>
 #include <utility>
 
@@ -19,11 +19,12 @@ void Mixer::connect() {
   const auto endpoints = resolver.resolve(host_, port_);
   asio::connect(socket_, endpoints);
   connected_ = true;
-  std::cout << "[Mixer] Connected to " << host_ << ":" << port_ << std::endl;
+  spdlog::info("[Mixer] Connected to {}:{}", host_, port_);
 }
 
 void Mixer::startReconnectionThread() {
-  if (running_) return;
+  if (running_)
+    return;
   running_ = true;
   reconnectThread_ = std::make_unique<std::thread>(&Mixer::runReconnectLoop, this);
 }
@@ -44,7 +45,7 @@ void Mixer::runReconnectLoop() {
       } catch (const std::exception &e) {
         connected_ = false;
         if (running_) {
-          std::cerr << "[Mixer] Connection failed: " << e.what() << ". Retrying in 3s..." << std::endl;
+          spdlog::error("[Mixer] Connection failed: {}. Retrying in 3s...", e.what());
         }
       }
     }
@@ -60,7 +61,7 @@ bool Mixer::isConnected() const { return connected_ && socket_.is_open(); }
 
 void Mixer::sendNrpn(const uint8_t midiChannel, const uint16_t parameter, const uint16_t value) {
   if (!socket_.is_open()) {
-    std::cerr << "[Mixer] Error: Socket is not open." << std::endl;
+    spdlog::error("[Mixer] Error: Socket is not open.");
     return;
   }
 
@@ -85,7 +86,7 @@ void Mixer::sendNrpn(const uint8_t midiChannel, const uint16_t parameter, const 
     asio::write(socket_, asio::buffer(tcpPacket));
   } catch (const asio::system_error &e) {
     connected_ = false;
-    std::cerr << "[Mixer] Send error: " << e.what() << std::endl;
+    spdlog::error("[Mixer] Send error: {}", e.what());
   }
 }
 
@@ -99,7 +100,7 @@ void Mixer::syncToBPM(const float bpm, const float multiplier) {
 
   const uint16_t nrpnValue = static_cast<uint16_t>(std::clamp(scaledValue, 0.0f, 16383.0f));
 
-  std::cout << "[Sync] BPM: " << bpm << " Multiplier: " << multiplier << " -> Delay: " << ms << "ms -> NRPN: " << nrpnValue << std::endl;
+  spdlog::info("[Sync] BPM: {} Multiplier: {} -> Delay: {}ms -> NRPN: {}", bpm, multiplier, ms, nrpnValue);
 
   if (isConnected()) {
     sendNrpn(midiChannel_, parameter_, nrpnValue);

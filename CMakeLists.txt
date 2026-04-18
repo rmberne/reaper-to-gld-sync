@@ -5,7 +5,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 1. Multi-Architecture (Universal Binary) Support
+# 1. Fetch spdlog
+include(FetchContent)
+FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG v1.15.0
+)
+FetchContent_MakeAvailable(spdlog)
+
+add_definitions(-DSPDLOG_USE_STD_FORMAT)
+
+# 2. Multi-Architecture (Universal Binary) Support
 # This ensures the binary contains both ARM (M1/M2) and Intel (x86_64) slices.
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build architectures for macOS" FORCE)
 
@@ -54,6 +65,8 @@ add_executable(${PROJECT_NAME}
         src/pulse_manager.hpp
         src/arduino_manager.cpp
         src/arduino_manager.hpp
+        src/logger.hpp
+        src/logger.cpp
 )
 
 # Set bundle properties to run as a Menu Bar app (LSUIElement)
@@ -79,6 +92,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE
         Threads::Threads
         rtmidi
+        spdlog::spdlog_header_only
         "-framework AppKit"
         "-framework Foundation"
         "-framework Cocoa"

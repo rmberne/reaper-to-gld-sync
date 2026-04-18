@@ -1,6 +1,6 @@
 #include "midi_manager.hpp"
 #include <chrono>
-#include <iostream>
+#include <spdlog/spdlog.h>
 #include <numeric>
 #include <utility>
 
@@ -29,7 +29,7 @@ namespace rt::midi {
     for (unsigned int i = 0; i < nInPorts; i++) {
       if (std::string name = midiin_->getPortName(i); name.find("ReaperSync IN") != std::string::npos) {
         midiin_->openPort(i);
-        std::cout << "[MIDI] Opened existing input port: " << name << std::endl;
+        spdlog::info("[MIDI] Opened existing input port: {}", name);
         inFound = true;
         break;
       }
@@ -38,7 +38,7 @@ namespace rt::midi {
     if (!inFound) {
       try {
         midiin_->openVirtualPort("ReaperSync IN");
-        std::cout << "[MIDI] Created virtual input port: ReaperSync IN" << std::endl;
+        spdlog::info("[MIDI] Created virtual input port: ReaperSync IN");
         inFound = true;
       } catch (RtMidiError &error) {
         // ... fallback to IAC ...
@@ -52,7 +52,7 @@ namespace rt::midi {
     for (unsigned int i = 0; i < nOutPorts; i++) {
       if (std::string name = midiout_->getPortName(i); name.find("ReaperSync OUT") != std::string::npos) {
         midiout_->openPort(i);
-        std::cout << "[MIDI] Opened existing output port: " << name << std::endl;
+        spdlog::info("[MIDI] Opened existing output port: {}", name);
         outFound = true;
         break;
       }
@@ -61,7 +61,7 @@ namespace rt::midi {
     if (!outFound) {
       try {
         midiout_->openVirtualPort("ReaperSync OUT");
-        std::cout << "[MIDI] Created virtual output port: ReaperSync OUT" << std::endl;
+        spdlog::info("[MIDI] Created virtual output port: ReaperSync OUT");
         outFound = true;
       } catch (RtMidiError &error) {
         // ... fallback to IAC ...
@@ -73,21 +73,21 @@ namespace rt::midi {
 
   void MidiManager::sendMidiMessage(const std::vector<unsigned char> &message) const {
     if (!midiout_) {
-      std::cerr << "[MIDI OUT] Failed: midiout_ pointer is null!" << std::endl;
+      spdlog::error("[MIDI OUT] Failed: midiout_ pointer is null!");
       return;
     }
 
     // Mac/CoreMIDI Quirk: Virtual ports sometimes report as "not open".
     // We log it as a warning but attempt to send it anyway!
     if (!midiout_->isPortOpen()) {
-      std::cout << "[MIDI OUT] Warning: isPortOpen() returned false, sending anyway..." << std::endl;
+      spdlog::warn("[MIDI OUT] Warning: isPortOpen() returned false, sending anyway...");
     }
 
     try {
       midiout_->sendMessage(&message);
 
     } catch (const RtMidiError &error) {
-      std::cerr << "[MIDI OUT] RtMidi Error: " << error.getMessage() << std::endl;
+      spdlog::error("[MIDI OUT] RtMidi Error: {}", error.getMessage());
     }
   }
 

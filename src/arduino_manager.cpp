@@ -1,7 +1,7 @@
 #include "arduino_manager.hpp"
 
 #include <filesystem>
-#include <iostream>
+#include <spdlog/spdlog.h>
 #include <vector>
 
 #if defined(__APPLE__) || defined(__linux__)
@@ -38,10 +38,10 @@ namespace rt::arduino {
 #endif
 
       running_ = true;
-      std::cout << "[Arduino] Opened port: " << port_name_ << " at 115200 baud" << std::endl;
+      spdlog::info("[Arduino] Opened port: {} at 115200 baud", port_name_);
       doRead();
     } catch (const std::exception &e) {
-      std::cerr << "[Arduino] Error opening serial port " << port_name_ << ": " << e.what() << std::endl;
+      spdlog::error("[Arduino] Error opening serial port {}: {}", port_name_, e.what());
     }
   }
 
@@ -70,13 +70,13 @@ namespace rt::arduino {
         }
         doRead();
       } else if (running_) {
-        std::cerr << "[Arduino] Read error on " << port_name_ << ": " << ec.message() << " (code: " << ec.value() << ")" << std::endl;
+        spdlog::error("[Arduino] Read error on {}: {} (code: {})", port_name_, ec.message(), ec.value());
       }
     });
   }
 
   void ArduinoManager::processCommand(const std::string &line) const {
-    std::cout << "[Arduino] Received command: " << line << std::endl;
+    spdlog::info("[Arduino] Received command: {}", line);
     if (line.empty())
       return;
     const char cmd = line[0];
@@ -88,19 +88,19 @@ namespace rt::arduino {
 
     switch (cmd) {
       case 's': // Start / Stop
-        std::cout << "[Arduino] Command: START/STOP" << std::endl;
+        spdlog::info("[Arduino] Command: START/STOP");
         msg = {0xB0, 100, 127}; // CC 100, Value 127
         break;
       case 'm': // Mute tracks (Toggle) - Using CC 102 as a suggestion
-        std::cout << "[Arduino] Command: MUTE" << std::endl;
+        spdlog::info("[Arduino] Command: MUTE");
         msg = {0xB0, 102, 127};
         break;
       case 'n': // Next Tab - Using CC 103 as a suggestion
-        std::cout << "[Arduino] Command: NEXT TAB" << std::endl;
+        spdlog::info("[Arduino] Command: NEXT TAB");
         msg = {0xB0, 103, 127};
         break;
       case 'p': // Prev Tab - Using CC 104 as a suggestion
-        std::cout << "[Arduino] Command: PREV TAB" << std::endl;
+        spdlog::info("[Arduino] Command: PREV TAB");
         msg = {0xB0, 104, 127};
         break;
       default:
@@ -123,15 +123,15 @@ namespace rt::arduino {
 
         // If the file starts with cu.usbmodem or cu.usbserial, it's our Arduino!
         if (std::string filename = entry.path().filename().string(); filename.find(modemPrefix) == 0 || filename.find(serialPrefix) == 0) {
-          std::cout << "[Auto-Detect] Found Arduino at: " << entry.path().string() << std::endl;
+          spdlog::info("[Auto-Detect] Found Arduino at: {}", entry.path().string());
           return entry.path().string();
         }
       }
     } catch (const std::exception &e) {
-      std::cerr << "[Auto-Detect] Error scanning /dev/: " << e.what() << std::endl;
+      spdlog::error("[Auto-Detect] Error scanning /dev/: {}", e.what());
     }
 
-    std::cerr << "[Auto-Detect] No Arduino found." << std::endl;
+    spdlog::warn("[Auto-Detect] No Arduino found.");
     return ""; // Return empty string if nothing is found
   }
 

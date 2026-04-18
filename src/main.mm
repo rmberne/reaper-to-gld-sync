@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #include "engine.hpp"
+#include "logger.hpp"
 #import "ConfigWindowController.h"
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
@@ -11,6 +12,7 @@
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+    rt::logger::init();
     self.engine = new Engine();
     
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];

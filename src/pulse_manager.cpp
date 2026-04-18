@@ -1,6 +1,6 @@
 #include "pulse_manager.hpp"
 #include <ableton/Link.hpp>
-#include <iostream>
+#include <spdlog/spdlog.h>
 
 namespace rt::midi {
 
@@ -18,7 +18,7 @@ namespace rt::midi {
 
       link.setNumPeersCallback([this](const std::size_t num) {
         if (num > 0) {
-          std::cout << "\n[Pulse Link] PEER FOUND. Synchronizing..." << std::endl;
+          spdlog::info("[Pulse Link] PEER FOUND. Synchronizing...");
 
           auto sessionState = link.captureAppSessionState();
           const auto hostTime = link.clock().micros();
@@ -35,7 +35,7 @@ namespace rt::midi {
   PulseManager::PulseManager() : impl_(new Impl()) {}
   PulseManager::~PulseManager() { delete impl_; }
 
-  void PulseManager::startConnection() { std::cout << "[Pulse Link] Engine running. Waiting for Soundbrenner App..." << std::endl; }
+  void PulseManager::startConnection() { spdlog::info("[Pulse Link] Engine running. Waiting for Soundbrenner App..."); }
 
   void PulseManager::setBpm(const int bpm) const {
     if (bpm <= 0)
@@ -53,7 +53,7 @@ namespace rt::midi {
     }
 
     impl_->link.commitAppSessionState(sessionState);
-    std::cout << "[Pulse Link] Set Tempo: " << bpm << std::endl;
+    spdlog::info("[Pulse Link] Set Tempo: {}", bpm);
   }
 
   void PulseManager::sendStart() const {
@@ -66,7 +66,7 @@ namespace rt::midi {
     sessionState.requestBeatAtTime(0.0, hostTime, 1.0);
 
     impl_->link.commitAppSessionState(sessionState);
-    std::cout << "[Pulse Link] Pushing PLAY state" << std::endl;
+    spdlog::info("[Pulse Link] Pushing PLAY state");
   }
 
   void PulseManager::sendStop() const {
@@ -76,7 +76,7 @@ namespace rt::midi {
 
     sessionState.setIsPlaying(false, hostTime);
     impl_->link.commitAppSessionState(sessionState);
-    std::cout << "[Pulse Link] Pushing STOP state" << std::endl;
+    spdlog::info("[Pulse Link] Pushing STOP state");
   }
 
 } // namespace rt::midi
