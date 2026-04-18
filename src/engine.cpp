@@ -8,24 +8,32 @@ Engine::Engine() : io_context_() {
 
 Engine::~Engine() { stop(); }
 
-void Engine::start() {
+void Engine::start(const EngineConfig &config) {
   if (running_)
     return;
 
-  try {
-    const auto cfg = config::ConfigLoader::load("config.txt");
+  std::cout << "[Engine] Starting with configuration:" << std::endl;
+  std::cout << "  - Arduino Enabled: " << (config.arduinoEnabled ? "YES" : "NO") << std::endl;
+  std::cout << "  - Pulse Enabled: " << (config.pulseEnabled ? "YES" : "NO") << std::endl;
+  std::cout << "  - Mixer Enabled: " << (config.mixerEnabled ? "YES" : "NO") << std::endl;
+  std::cout << "  - Mixer IP: " << config.mixerIp << std::endl;
+  std::cout << "  - Mixer Port: " << config.mixerPort << std::endl;
+  std::cout << "  - MIDI Channel: " << config.midiChannel << std::endl;
+  std::cout << "  - NRPN Param: " << config.nrpnParam << std::endl;
 
-    if (cfg.pulseEnabled) {
-      pulse_ = std::make_shared<rt::midi::PulseManager>();
+  try {
+    if (config.pulseEnabled) {
+      pulse_ = std::make_shared<PulseManager>();
       pulse_->startConnection();
     }
 
-    if (cfg.mixerEnabled) {
-      mixer_ = std::make_shared<Mixer>(io_context_, cfg.mixerIp, cfg.mixerPort, cfg.midiChannel, cfg.nrpnParam);
+    if (config.mixerEnabled) {
+      mixer_ = std::make_shared<Mixer>(io_context_, config.mixerIp, std::to_string(config.mixerPort), static_cast<uint8_t>(config.midiChannel),
+                                       static_cast<uint16_t>(config.nrpnParam));
       mixer_->startReconnectionThread();
     }
 
-    midi_manager_ = std::make_unique<rt::midi::MidiManager>([this](const float bpm, const float multiplier) {
+    midi_manager_ = std::make_unique<MidiManager>([this](const float bpm, const float multiplier) {
       const int current = static_cast<int>(std::round(bpm * multiplier));
       currentKnownBpm_ = current;
 
@@ -66,8 +74,8 @@ void Engine::start() {
     }
     midi_manager_->start();
 
-    if (cfg.arduinoEnabled) {
-      arduino_ = std::make_shared<rt::arduino::ArduinoManager>(io_context_, cfg.arduinoPort, [this](const std::vector<unsigned char> &msg) {
+    if (config.arduinoEnabled) {
+      arduino_ = std::make_shared<rt::arduino::ArduinoManager>(io_context_, [this](const std::vector<unsigned char> &msg) {
         if (midi_manager_)
           midi_manager_->sendMidiMessage(msg);
       });

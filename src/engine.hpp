@@ -5,17 +5,26 @@
 #include <memory>
 #include <thread>
 #include "arduino_manager.hpp"
-#include "config_loader.hpp"
 #include "midi_manager.hpp"
 #include "mixer.hpp"
 #include "pulse_manager.hpp"
+
+struct EngineConfig {
+  bool arduinoEnabled;
+  bool pulseEnabled;
+  bool mixerEnabled;
+  std::string mixerIp;
+  int mixerPort;
+  int midiChannel;
+  int nrpnParam;
+};
 
 class Engine {
   public:
   Engine();
   ~Engine();
 
-  void start();
+  void start(const EngineConfig &config);
   void stop();
   bool isRunning() const { return running_; }
 
@@ -23,9 +32,9 @@ class Engine {
   asio::io_context io_context_;
   std::unique_ptr<asio::executor_work_guard<asio::io_context::executor_type>> work_guard_;
 
-  std::shared_ptr<rt::midi::PulseManager> pulse_;
+  std::shared_ptr<PulseManager> pulse_;
   std::shared_ptr<Mixer> mixer_;
-  std::unique_ptr<rt::midi::MidiManager> midi_manager_;
+  std::unique_ptr<MidiManager> midi_manager_;
   std::shared_ptr<rt::arduino::ArduinoManager> arduino_;
 
   std::thread io_thread_;

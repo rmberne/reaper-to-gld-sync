@@ -21,57 +21,80 @@ add_subdirectory(libs/rtmidi EXCLUDE_FROM_ALL)
 # Enable Objective-C++
 enable_language(OBJCXX)
 
+# Enable ARC for Objective-C++
+set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc")
+
+# UI resources
+set(XIB_FILE "src/ReaperSyncPrefsUI/ReaperSyncPrefsUI/ConfigWindow.xib")
+set(NIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/ConfigWindow.nib")
+add_custom_command(
+        OUTPUT ${NIB_FILE}
+        COMMAND ibtool --compile ${NIB_FILE} ${CMAKE_CURRENT_SOURCE_DIR}/${XIB_FILE}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${XIB_FILE}
+        COMMENT "Compiling ConfigWindow.xib into ConfigWindow.nib..."
+)
+set_source_files_properties(${NIB_FILE} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources
+)
+
 # 3. Define our executable
 add_executable(${PROJECT_NAME}
-    MACOSX_BUNDLE
-    src/main.mm
-    src/engine.cpp
-    src/engine.hpp
-    src/mixer.cpp
-    src/mixer.hpp
-    src/midi_manager.cpp
-    src/midi_manager.hpp
-    src/config_loader.cpp
-    src/config_loader.hpp
-    src/pulse_manager.cpp
-    src/pulse_manager.hpp
-    src/arduino_manager.cpp
-    src/arduino_manager.hpp
+        MACOSX_BUNDLE
+        src/main.mm
+        src/engine.cpp
+        src/engine.hpp
+        src/ConfigWindowController.h
+        src/ConfigWindowController.mm
+        ${NIB_FILE}
+        src/mixer.cpp
+        src/mixer.hpp
+        src/midi_manager.cpp
+        src/midi_manager.hpp
+        src/pulse_manager.cpp
+        src/pulse_manager.hpp
+        src/arduino_manager.cpp
+        src/arduino_manager.hpp
 )
 
 # Set bundle properties to run as a Menu Bar app (LSUIElement)
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.rmberne.reapersync"
+        MACOSX_BUNDLE_BUNDLE_NAME "ReaperSync"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1"
+        MACOSX_BUNDLE_COPYRIGHT "Copyright © 2024 YourName. All rights reserved."
+        RESOURCE "${NIB_FILE}"
 )
 
 # 4. Include paths
-target_include_directories(${PROJECT_NAME} PRIVATE 
-    ${CMAKE_SOURCE_DIR}/libs/rtmidi
-    ${CMAKE_SOURCE_DIR}/libs/link/include
-    ${CMAKE_SOURCE_DIR}/libs/link/modules/asio-standalone/asio/include
-    /opt/homebrew/include
+target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/libs/rtmidi
+        ${CMAKE_SOURCE_DIR}/libs/link/include
+        ${CMAKE_SOURCE_DIR}/libs/link/modules/asio-standalone/asio/include
+        /opt/homebrew/include
 )
 
 # 5. Linking
 find_package(Threads REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-    Threads::Threads
-    rtmidi
-    "-framework AppKit"
-    "-framework Foundation"
-    "-framework Cocoa"
-    "-framework CoreMIDI"
-    "-framework CoreAudio"
-    "-framework CoreFoundation"
-    "-framework CoreServices"
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        Threads::Threads
+        rtmidi
+        "-framework AppKit"
+        "-framework Foundation"
+        "-framework Cocoa"
+        "-framework CoreMIDI"
+        "-framework CoreAudio"
+        "-framework CoreFoundation"
+        "-framework CoreServices"
 )
 
 # Optional: Print architecture info at the end of the build
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
-    COMMENT "Verifying binary architectures..."
+        COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
+        COMMENT "Verifying binary architectures..."
 )
 
 # 6. Tests
-add_executable(test_config tests/test_config.cpp src/config_loader.cpp)
-target_include_directories(test_config PRIVATE src)
+# (Disabled as config_loader was removed)
+# add_executable(test_config tests/test_config.cpp src/config_loader.cpp)
+# target_include_directories(test_config PRIVATE src)

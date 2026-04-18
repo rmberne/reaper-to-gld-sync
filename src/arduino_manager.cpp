@@ -1,4 +1,6 @@
 #include "arduino_manager.hpp"
+
+#include <filesystem>
 #include <iostream>
 #include <vector>
 
@@ -9,8 +11,10 @@
 
 namespace rt::arduino {
 
-  ArduinoManager::ArduinoManager(asio::io_context &io_context, std::string port_name, CommandCallback callback) :
-      io_context_(io_context), port_name_(std::move(port_name)), serial_(io_context), callback_(std::move(callback)), read_buf_{} {}
+  ArduinoManager::ArduinoManager(asio::io_context &io_context, CommandCallback callback) :
+      io_context_(io_context), serial_(io_context), callback_(std::move(callback)), read_buf_{} {
+    port_name_ = autoDetectArduinoPort();
+  }
 
   ArduinoManager::~ArduinoManager() { stop(); }
 
@@ -25,7 +29,7 @@ namespace rt::arduino {
 
 #if defined(__APPLE__) || defined(__linux__)
       // Arduinos often reset on connection. DTR/RTS might need to be toggled or set.
-      int fd = serial_.native_handle();
+      const int fd = serial_.native_handle();
       int flags;
       ioctl(fd, TIOCMGET, &flags);
       flags |= TIOCM_DTR;
@@ -52,7 +56,7 @@ namespace rt::arduino {
     if (!running_)
       return;
 
-    serial_.async_read_some(asio::buffer(read_buf_, sizeof(read_buf_)), [this](const std::error_code ec, std::size_t bytes_transferred) {
+    serial_.async_read_some(asio::buffer(read_buf_, sizeof(read_buf_)), [this](const std::error_code ec, const std::size_t bytes_transferred) {
       if (!ec) {
         for (std::size_t i = 0; i < bytes_transferred; ++i) {
           if (const char c = read_buf_[i]; c == '\n' || c == '\r') {
@@ -71,9 +75,10 @@ namespace rt::arduino {
     });
   }
 
-  void ArduinoManager::processCommand(const std::string& line) const {
+  void ArduinoManager::processCommand(const std::string &line) const {
     std::cout << "[Arduino] Received command: " << line << std::endl;
-    if (line.empty()) return;
+    if (line.empty())
+      return;
     const char cmd = line[0];
     // Mapping based on typical Arduino char commands
     // 's' = start, 'x' = stop, 'm' = mute, 'n' = next tab, 'p' = prev tab
@@ -106,6 +111,28 @@ namespace rt::arduino {
     if (valid && callback_) {
       callback_(msg);
     }
+  }
+
+  std::string ArduinoManager::autoDetectArduinoPort() {
+    constexpr std::string devPath = "/dev/";
+    constexpr std::string modemPrefix = "cu.usbmodem";
+    constexpr std::string serialPrefix = "cu.usbserial";
+
+    try {
+      for (const auto &entry: std::filesystem::directory_iterator(devPath)) {
+
+        // If the file starts with cu.usbmodem or cu.usbserial, it's our Arduino!
+        if (std::string filename = entry.path().filename().string(); filename.find(modemPrefix) == 0 || filename.find(serialPrefix) == 0) {
+          std::cout << "[Auto-Detect] Found Arduino at: " << entry.path().string() << std::endl;
+          return entry.path().string();
+        }
+      }
+    } catch (const std::exception &e) {
+      std::cerr << "[Auto-Detect] Error scanning /dev/: " << e.what() << std::endl;
+    }
+
+    std::cerr << "[Auto-Detect] No Arduino found." << std::endl;
+    return ""; // Return empty string if nothing is found
   }
 
 } // namespace rt::arduino
