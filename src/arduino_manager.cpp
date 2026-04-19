@@ -16,10 +16,25 @@ namespace rt::arduino {
     port_name_ = autoDetectArduinoPort();
   }
 
-  ArduinoManager::~ArduinoManager() { stop(); }
+  ArduinoManager::~ArduinoManager() {
+    stopReconnectionThread();
+    stop();
+  }
 
   void ArduinoManager::start() {
+    if (connected_)
+      return;
+
     try {
+      port_name_ = autoDetectArduinoPort();
+      if (port_name_.empty()) {
+        return;
+      }
+
+      if (serial_.is_open()) {
+        serial_.close();
+      }
+
       serial_.open(port_name_);
       serial_.set_option(asio::serial_port_base::baud_rate(115200));
       serial_.set_option(asio::serial_port_base::character_size(8));
@@ -38,18 +53,62 @@ namespace rt::arduino {
 #endif
 
       running_ = true;
+      connected_ = true;
       spdlog::info("[Arduino] Opened port: {} at 115200 baud", port_name_);
       doRead();
     } catch (const std::exception &e) {
+      connected_ = false;
       spdlog::error("[Arduino] Error opening serial port {}: {}", port_name_, e.what());
     }
   }
 
   void ArduinoManager::stop() {
+    connected_ = false;
     running_ = false;
     if (serial_.is_open()) {
-      serial_.close();
+      std::error_code ec;
+      serial_.close(ec);
     }
+  }
+
+  void ArduinoManager::startReconnectionThread() {
+    if (reconnectThread_)
+      return;
+    running_ = true;
+    reconnectThread_ = std::make_unique<std::thread>(&ArduinoManager::runReconnectLoop, this);
+  }
+
+  void ArduinoManager::stopReconnectionThread() {
+    running_ = false;
+    if (reconnectThread_ && reconnectThread_->joinable()) {
+      reconnectThread_->join();
+      reconnectThread_.reset();
+    }
+  }
+
+  void ArduinoManager::runReconnectLoop() {
+    while (running_) {
+      if (!connected_) {
+        start();
+      }
+
+      // Sleep in small increments to respond quickly to shutdown
+      for (int i = 0; i < 30 && running_; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+    }
+  }
+
+  void ArduinoManager::sendCommand(const char cmd) {
+    if (!connected_ || !serial_.is_open())
+      return;
+
+    asio::async_write(serial_, asio::buffer(&cmd, 1), [this, cmd](const std::error_code ec, std::size_t /*bytes_transferred*/) {
+      if (ec) {
+        spdlog::error("[Arduino] Write error for command {}: {}", cmd, ec.message());
+        connected_ = false;
+      }
+    });
   }
 
   void ArduinoManager::doRead() {
@@ -71,6 +130,7 @@ namespace rt::arduino {
         doRead();
       } else if (running_) {
         spdlog::error("[Arduino] Read error on {}: {} (code: {})", port_name_, ec.message(), ec.value());
+        connected_ = false;
       }
     });
   }

@@ -17,10 +17,14 @@ public:
 
     void start();
     void stop();
+    void startReconnectionThread();
+    void stopReconnectionThread();
+    void sendCommand(char cmd);
 
 private:
     void doRead();
     void processCommand(const std::string &line) const;
+    void runReconnectLoop();
     static std::string autoDetectArduinoPort();
 
     asio::io_context &io_context_;
@@ -29,7 +33,9 @@ private:
     CommandCallback callback_;
     char read_buf_[1024];
     std::string line_buffer_;
-    bool running_ = false;
+    std::atomic<bool> running_ = false;
+    std::atomic<bool> connected_ = false;
+    std::unique_ptr<std::thread> reconnectThread_;
   };
 
 } // namespace rt::arduino

@@ -59,11 +59,17 @@ void Engine::start(const EngineConfig &config) {
         if (mixer_ && mixer_->isConnected()) {
           mixer_->syncToBPM(static_cast<float>(currentKnownBpm_), 1.0f);
         }
+        if (arduino_) {
+          arduino_->sendCommand('1');
+        }
         lastBpm_ = currentKnownBpm_;
       } else if (status == 0xFC) {
         spdlog::info("[Transport] STOP");
         if (pulse_)
           pulse_->sendStop();
+        if (arduino_) {
+          arduino_->sendCommand('0');
+        }
         lastBpm_ = -1;
       }
     });
@@ -79,7 +85,7 @@ void Engine::start(const EngineConfig &config) {
         if (midi_manager_)
           midi_manager_->sendMidiMessage(msg);
       });
-      arduino_->start();
+      arduino_->startReconnectionThread();
     }
 
     running_ = true;
