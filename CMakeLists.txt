@@ -151,6 +151,26 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework CoreServices"
 )
 
+# ==============================================================================
+# PACKAGING (Creating the .dmg "Installer")
+# ==============================================================================
+# CPack requires an install target for the bundle
+install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION .)
+
+# Tell CPack we want a macOS Drag & Drop DMG
+set(CPACK_GENERATOR "DragNDrop")
+
+# Configure the DMG visual name and filename
+set(CPACK_DMG_VOLUME_NAME "ReaperSync Installer")
+set(CPACK_PACKAGE_FILE_NAME "ReaperSync-v${PROJECT_VERSION}-Universal")
+
+# (Optional) If you have a custom license file, CPack will make the user click "Agree" 
+# before the DMG opens. Just create a license.txt in your root folder.
+# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
+
+# Include CPack at the very end
+include(CPack)
+
 # Print architecture info at the end of the build
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>

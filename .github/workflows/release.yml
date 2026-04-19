@@ -25,12 +25,12 @@ jobs:
     - name: Package
       run: |
         cd build
-        zip -r reaper_gld_sync_macos_${{ github.ref_name }}.zip reaper_gld_sync.app
+        cpack -C Release
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: build/reaper_gld_sync_macos_${{ github.ref_name }}.zip
+        files: build/ReaperSync-v*-Universal.dmg
         generate_release_notes: true
         draft: false
         prerelease: false
