@@ -90,6 +90,12 @@ set_source_files_properties(${NIB_FILE} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
 )
 
+set(ICON_FILE "AppIcon.icns")
+
+set_source_files_properties(${ICON_FILE} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources
+)
+
 # Define our executable
 add_executable(${PROJECT_NAME}
         MACOSX_BUNDLE
@@ -99,6 +105,7 @@ add_executable(${PROJECT_NAME}
         src/ConfigWindowController.h
         src/ConfigWindowController.mm
         ${NIB_FILE}
+        ${ICON_FILE}
         src/mixer.cpp
         src/mixer.hpp
         src/midi_manager.cpp
@@ -118,7 +125,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
         MACOSX_BUNDLE_BUNDLE_VERSION "1"
         MACOSX_BUNDLE_COPYRIGHT "Copyright © 2024 YourName. All rights reserved."
-        RESOURCE "${NIB_FILE}"
+        MACOSX_BUNDLE_ICON_FILE "AppIcon.icns"
+        RESOURCE "${NIB_FILE};${ICON_FILE}"
 )
 
 # Dynamic Include Paths based on FetchContent downloads
