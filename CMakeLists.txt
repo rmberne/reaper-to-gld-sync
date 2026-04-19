@@ -28,6 +28,8 @@ endif ()
 include(FetchContent)
 
 # 1. Fetch spdlog
+set(SPDLOG_BUILD_EXAMPLES OFF CACHE BOOL "Disable spdlog examples" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "Disable spdlog tests" FORCE)
 FetchContent_Declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
@@ -54,6 +56,8 @@ FetchContent_Declare(
 # 4. Fetch Ableton Link
 set(LINK_BUILD_TESTS OFF CACHE BOOL "Disable Link tests" FORCE)
 set(LINK_BUILD_EXAMPLES OFF CACHE BOOL "Disable Link examples" FORCE)
+set(LINK_BUILD_QT_EXAMPLES OFF CACHE BOOL "Disable Link Qt examples" FORCE)
+set(LINK_BUILD_ASIO_EXAMPLES OFF CACHE BOOL "Disable Link Asio examples" FORCE)
 FetchContent_Declare(
         ableton_link
         GIT_REPOSITORY https://github.com/Ableton/link.git
@@ -64,7 +68,13 @@ FetchContent_Declare(
 )
 
 # Make all dependencies available to the build system
-FetchContent_MakeAvailable(spdlog asio rtmidi ableton_link)
+FetchContent_MakeAvailable(spdlog asio rtmidi)
+
+# Ableton Link is header-only for our needs, we manually fetch it
+FetchContent_GetProperties(ableton_link)
+if(NOT ableton_link_POPULATED)
+    FetchContent_Populate(ableton_link)
+endif()
 # ==============================================================================
 
 # UI resources
