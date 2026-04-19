@@ -5,7 +5,10 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS version" FORCE)
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build architectures for macOS" FORCE)
 
 # Enable C++, Objective-C, and Objective-C++
-project(reaper_gld_sync VERSION 1.0.0 LANGUAGES CXX OBJC OBJCXX)
+project(ReaperSync VERSION 1.0.0 LANGUAGES CXX OBJC OBJCXX)
+
+# Rename the output executable to ReaperSync (matching project name by default)
+set(EXE_NAME "ReaperSync")
 
 # C++17 is the safest modern standard for macOS 10.15
 set(CMAKE_CXX_STANDARD 17)
@@ -97,7 +100,7 @@ set_source_files_properties(${ICON_FILE} PROPERTIES
 )
 
 # Define our executable
-add_executable(${PROJECT_NAME}
+add_executable(${EXE_NAME}
         MACOSX_BUNDLE
         src/main.mm
         src/engine.cpp
@@ -119,18 +122,19 @@ add_executable(${PROJECT_NAME}
 )
 
 # Set bundle properties to run as a Menu Bar app (LSUIElement)
-set_target_properties(${PROJECT_NAME} PROPERTIES
+set_target_properties(${EXE_NAME} PROPERTIES
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.rmberne.reapersync"
         MACOSX_BUNDLE_BUNDLE_NAME "ReaperSync"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
         MACOSX_BUNDLE_BUNDLE_VERSION "1"
         MACOSX_BUNDLE_COPYRIGHT "Copyright © 2024 YourName. All rights reserved."
         MACOSX_BUNDLE_ICON_FILE "AppIcon.icns"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
         RESOURCE "${NIB_FILE};${ICON_FILE}"
 )
 
 # Dynamic Include Paths based on FetchContent downloads
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(${EXE_NAME} PRIVATE
         ${rtmidi_SOURCE_DIR}
         ${ableton_link_SOURCE_DIR}/include
         ${asio_SOURCE_DIR}/asio/include  # Points directly to the dedicated ASIO fetch
@@ -138,7 +142,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 # Linking
 find_package(Threads REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(${EXE_NAME} PRIVATE
         Threads::Threads
         rtmidi
         spdlog::spdlog_header_only
@@ -155,7 +159,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # PACKAGING (Creating the .dmg "Installer")
 # ==============================================================================
 # CPack requires an install target for the bundle
-install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION .)
+# Install the bundle into a 'ReaperSync' folder
+install(TARGETS ${EXE_NAME} BUNDLE DESTINATION ReaperSync)
 
 # Tell CPack we want a macOS Drag & Drop DMG
 set(CPACK_GENERATOR "DragNDrop")
@@ -172,7 +177,7 @@ set(CPACK_PACKAGE_FILE_NAME "ReaperSync-v${PROJECT_VERSION}-Universal")
 include(CPack)
 
 # Print architecture info at the end of the build
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
+add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+        COMMAND lipo -info $<TARGET_FILE:${EXE_NAME}>
         COMMENT "Verifying binary architectures..."
 )

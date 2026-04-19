@@ -58,4 +58,4 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 ```
 
-The build will produce a `reaper_gld_sync.app` bundle in the `build` directory.
+The build will produce a `ReaperSync.app` bundle in the `build` directory.
