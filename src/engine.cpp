@@ -23,7 +23,7 @@ void Engine::start(const EngineConfig &config) {
 
   try {
     if (config.pulseEnabled) {
-      pulse_ = std::make_shared<PulseManager>();
+      pulse_ = std::make_shared<rt::midi::PulseManager>();
       pulse_->startConnection();
     }
 
@@ -33,7 +33,7 @@ void Engine::start(const EngineConfig &config) {
       mixer_->startReconnectionThread();
     }
 
-    midi_manager_ = std::make_unique<MidiManager>([this](const float bpm, const float multiplier) {
+    midi_manager_ = std::make_unique<rt::midi::MidiManager>([this](const float bpm, const float multiplier) {
       const int current = static_cast<int>(std::round(bpm * multiplier));
       currentKnownBpm_ = current;
 

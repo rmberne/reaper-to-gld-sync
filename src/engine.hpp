@@ -32,9 +32,9 @@ class Engine {
   asio::io_context io_context_;
   std::unique_ptr<asio::executor_work_guard<asio::io_context::executor_type>> work_guard_;
 
-  std::shared_ptr<PulseManager> pulse_;
+  std::shared_ptr<rt::midi::PulseManager> pulse_;
   std::shared_ptr<Mixer> mixer_;
-  std::unique_ptr<MidiManager> midi_manager_;
+  std::unique_ptr<rt::midi::MidiManager> midi_manager_;
   std::shared_ptr<rt::arduino::ArduinoManager> arduino_;
 
   std::thread io_thread_;

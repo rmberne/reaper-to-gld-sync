@@ -114,9 +114,9 @@ namespace rt::arduino {
   }
 
   std::string ArduinoManager::autoDetectArduinoPort() {
-    constexpr std::string devPath = "/dev/";
-    constexpr std::string modemPrefix = "cu.usbmodem";
-    constexpr std::string serialPrefix = "cu.usbserial";
+    const std::string devPath = "/dev/";
+    const std::string modemPrefix = "cu.usbmodem";
+    const std::string serialPrefix = "cu.usbserial";
 
     try {
       for (const auto &entry: std::filesystem::directory_iterator(devPath)) {

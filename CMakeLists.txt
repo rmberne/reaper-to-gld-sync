@@ -1,39 +1,71 @@
 cmake_minimum_required(VERSION 3.20)
-project(reaper_gld_sync VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+# 1. APPLE DEPLOYMENT TARGET (MUST BE BEFORE project())
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS version" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build architectures for macOS" FORCE)
+
+# Enable C++, Objective-C, and Objective-C++
+project(reaper_gld_sync VERSION 1.0.0 LANGUAGES CXX OBJC OBJCXX)
+
+# C++17 is the safest modern standard for macOS 10.15
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 1. Fetch spdlog
+# Force ASIO to run in standalone mode (no Boost required)
+add_definitions(-DASIO_STANDALONE)
+add_definitions(-DLINK_PLATFORM_MACOSX=1)
+
+# Objective-C/C++ compatibility flags for 10.15
+if (APPLE)
+    set(CMAKE_OBJC_FLAGS "${CMAKE_OBJC_FLAGS} -fobjc-arc -DOBJC_OLD_DISPATCH_PROTOTYPES=0")
+    set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc -DOBJC_OLD_DISPATCH_PROTOTYPES=0")
+endif ()
+
+# ==============================================================================
+# DEPENDENCY MANAGEMENT (Fetch at Compile Time)
+# ==============================================================================
 include(FetchContent)
+
+# 1. Fetch spdlog
 FetchContent_Declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
         GIT_TAG v1.15.0
 )
-FetchContent_MakeAvailable(spdlog)
 
-add_definitions(-DSPDLOG_USE_STD_FORMAT)
+# 2. Fetch ASIO (Standalone)
+FetchContent_Declare(
+        asio
+        GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+        GIT_TAG asio-1-30-2
+)
 
-# 2. Multi-Architecture (Universal Binary) Support
-# This ensures the binary contains both ARM (M1/M2) and Intel (x86_64) slices.
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build architectures for macOS" FORCE)
+# 3. Fetch RtMidi
+set(RTMIDI_BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared libs" FORCE)
+set(RTMIDI_API_CORE ON CACHE BOOL "Enable CoreMIDI" FORCE)
+set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "Disable tests" FORCE)
+FetchContent_Declare(
+        rtmidi
+        GIT_REPOSITORY https://github.com/thestk/rtmidi.git
+        GIT_TAG 5.0.0
+)
 
-add_definitions(-DLINK_PLATFORM_MACOSX=1)
+# 4. Fetch Ableton Link
+set(LINK_BUILD_TESTS OFF CACHE BOOL "Disable Link tests" FORCE)
+set(LINK_BUILD_EXAMPLES OFF CACHE BOOL "Disable Link examples" FORCE)
+FetchContent_Declare(
+        ableton_link
+        GIT_REPOSITORY https://github.com/Ableton/link.git
+        GIT_TAG Link-3.1.2
+        # We no longer strictly need submodules since we fetch ASIO manually, 
+        # but Link's build system might still look for it, so we leave it ON.
+        GIT_SUBMODULES_RECURSE ON
+)
 
-# 2. Add RtMidi as a sub-project
-# We disable shared libraries to force static linking of RtMidi
-set(RTMIDI_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(RTMIDI_API_CORE ON CACHE BOOL "" FORCE)
-set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-add_subdirectory(libs/rtmidi EXCLUDE_FROM_ALL)
-
-# Enable Objective-C++
-enable_language(OBJCXX)
-
-# Enable ARC for Objective-C++
-set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc")
+# Make all dependencies available to the build system
+FetchContent_MakeAvailable(spdlog asio rtmidi ableton_link)
+# ==============================================================================
 
 # UI resources
 set(XIB_FILE "src/ReaperSyncPrefsUI/ReaperSyncPrefsUI/ConfigWindow.xib")
@@ -48,7 +80,7 @@ set_source_files_properties(${NIB_FILE} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
 )
 
-# 3. Define our executable
+# Define our executable
 add_executable(${PROJECT_NAME}
         MACOSX_BUNDLE
         src/main.mm
@@ -79,15 +111,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         RESOURCE "${NIB_FILE}"
 )
 
-# 4. Include paths
+# Dynamic Include Paths based on FetchContent downloads
 target_include_directories(${PROJECT_NAME} PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/rtmidi
-        ${CMAKE_SOURCE_DIR}/libs/link/include
-        ${CMAKE_SOURCE_DIR}/libs/link/modules/asio-standalone/asio/include
-        /opt/homebrew/include
+        ${rtmidi_SOURCE_DIR}
+        ${ableton_link_SOURCE_DIR}/include
+        ${asio_SOURCE_DIR}/asio/include  # Points directly to the dedicated ASIO fetch
 )
 
-# 5. Linking
+# Linking
 find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE
         Threads::Threads
@@ -102,13 +133,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework CoreServices"
 )
 
-# Optional: Print architecture info at the end of the build
+# Print architecture info at the end of the build
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND lipo -info $<TARGET_FILE:${PROJECT_NAME}>
         COMMENT "Verifying binary architectures..."
 )
-
-# 6. Tests
-# (Disabled as config_loader was removed)
-# add_executable(test_config tests/test_config.cpp src/config_loader.cpp)
-# target_include_directories(test_config PRIVATE src)

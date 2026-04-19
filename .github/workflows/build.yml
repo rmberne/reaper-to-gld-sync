@@ -15,9 +15,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Dependencies
-      run: brew install asio
-
     - name: Configure CMake
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
